@@ -391,4 +391,5 @@ addEventListener('online',()=>{netFail=0;tick()});addEventListener('offline',sta
  status();tick();setInterval(tick,REFRESH)})();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
+window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook
 })();
