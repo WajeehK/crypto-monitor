@@ -159,7 +159,7 @@ function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_ca
 function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';
  $('#nkgo').onclick=()=>{const m=$('#nkin').value.match(/k=([A-Za-z0-9_-]{43})/)||$('#nkin').value.trim().match(/^([A-Za-z0-9_-]{43})$/);if(!m){$('#nkerr').textContent='That does not look like your personal link.';return}
   localStorage.setItem('ct_k',m[1]);location.reload()}}
-async function tick(){if(!KEY||(document.hidden&&BLOB))return;const now=Date.now()/1000,slot=Math.floor((now-12)/60);
+async function tick(){if(!KEY||(document.hidden&&BLOB))return;const now=Date.now()/1000,slot=Math.floor((now-15)/60);
  try{
   // a new file path every minute (s/<unix-minute>.bin) -> GitHub's raw CDN serves it fresh
   if(slot>lastSlot){lastSlot=slot;for(const x of (BLOB?[slot,slot-1]:[slot,slot-1,slot-2,slot-3])){if(BLOB&&BLOB.slot>=x)break;if(tried.has(x))continue;tried.add(x);const b=await getBlob('data/s/'+x+'.bin');if(b){accept(b);break}}}
