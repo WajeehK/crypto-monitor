@@ -162,14 +162,14 @@ function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textCon
 async function tick(){if(document.hidden||!KEY)return;const now=Date.now()/1000,slot=Math.floor((now-12)/60);
  try{
   // a new file path every minute (s/<unix-minute>.bin) -> GitHub's raw CDN serves it fresh
-  if(slot>lastSlot){lastSlot=slot;for(const x of [slot,slot-1]){if(BLOB&&BLOB.slot>=x)break;if(tried.has(x))continue;tried.add(x);const b=await getBlob('data/s/'+x+'.bin');if(b){accept(b);break}}}
+  if(slot>lastSlot){lastSlot=slot;for(const x of (BLOB?[slot,slot-1]:[slot,slot-1,slot-2,slot-3])){if(BLOB&&BLOB.slot>=x)break;if(tried.has(x))continue;tried.add(x);const b=await getBlob('data/s/'+x+'.bin');if(b){accept(b);break}}}
   // fallback (first open, or the minute files were missed): resolve the branch head once every 3 min via the API (60/h limit)
   const age=BLOB?now-BLOB.pushed_at:1e9;
-  if(age>150&&now-lastApi>180){lastApi=now;const r=await fetch('https://api.github.com/repos/'+REPO+'/commits/data',{headers:{Accept:'application/vnd.github.sha'},cache:'no-store'});
+  if(age>150&&now-lastApi>(BLOB?180:20)){lastApi=now;const r=await fetch('https://api.github.com/repos/'+REPO+'/commits/data',{headers:{Accept:'application/vnd.github.sha'},cache:'no-store'});
    if(r.ok){const sha=(await r.text()).trim();if(/^[0-9a-f]{40}$/.test(sha)&&sha!==lastSha){accept(await getBlob(sha+'/latest.bin'));lastSha=sha}}
    else if(r.status!==403&&r.status!==429)throw new Error('api '+r.status)}
   netFail=0}
- catch(e){if(e&&e.name==='OperationError'){badKey();return}netFail++}
+ catch(e){if(e&&e.name==='OperationError'){badKey();return}netFail++;console.debug('data fetch failed',e)}
  status()}
 function fixHealth(){const h=S.health,t=Date.parse(h.utc||'');if(!isNaN(t)){h.age_s=Math.max(0,Date.now()/1000-t/1000);h.stale=h.age_s>180}}
 function status(){const el=$('#stale');if(!KEY||!S){el.hidden=true;return}
