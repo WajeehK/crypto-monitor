@@ -159,7 +159,7 @@ function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_ca
 function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';
  $('#nkgo').onclick=()=>{const m=$('#nkin').value.match(/k=([A-Za-z0-9_-]{43})/)||$('#nkin').value.trim().match(/^([A-Za-z0-9_-]{43})$/);if(!m){$('#nkerr').textContent='That does not look like your personal link.';return}
   localStorage.setItem('ct_k',m[1]);location.reload()}}
-async function tick(){if(document.hidden||!KEY)return;const now=Date.now()/1000,slot=Math.floor((now-12)/60);
+async function tick(){if(!KEY||(document.hidden&&BLOB))return;const now=Date.now()/1000,slot=Math.floor((now-12)/60);
  try{
   // a new file path every minute (s/<unix-minute>.bin) -> GitHub's raw CDN serves it fresh
   if(slot>lastSlot){lastSlot=slot;for(const x of (BLOB?[slot,slot-1]:[slot,slot-1,slot-2,slot-3])){if(BLOB&&BLOB.slot>=x)break;if(tried.has(x))continue;tried.add(x);const b=await getBlob('data/s/'+x+'.bin');if(b){accept(b);break}}}
@@ -175,7 +175,7 @@ function fixHealth(){const h=S.health,t=Date.parse(h.utc||'');if(!isNaN(t)){h.ag
 function status(){const el=$('#stale');if(!KEY||!S){el.hidden=true;return}
  const hb=Date.parse(S.health.utc||'')||S.pushed_at*1000,age=(Date.now()-hb)/1000,at=hm(new Date(hb).toISOString());let html='',net=false;
  if(netFail>=2||!navigator.onLine){net=true;html=`<i></i>Reconnecting… <small>showing data from ${at}</small>`}
- else if(age>180)html=`<i></i>Last bot update ${at} <small>${wsOK?'prices still live':'bot offline'}</small>`;
+ else if(age>180){const mi=Math.round(age/60);html=`<i></i>Last bot update ${at} <small>${mi<90?mi+' min':Math.round(mi/60)+' h'} ago${wsOK?' · prices live':''}</small>`}
  el.hidden=!html;if(html)el.innerHTML=html;el.classList.toggle('net',net);$('#live').classList.toggle('off',!!html)}
 
 /* ---------- live prices straight from Kraken (no box involved) ---------- */
@@ -200,7 +200,7 @@ function applyLive(){if(!S)return;let up=0,fees=0;fixHealth();
   up+=p.upnl||0;fees+=p.entry_fee||0});
  const a=S.account;a.upnl=up;a.equity=a.last_closed_equity-fees+up;a.total_pnl=a.equity-a.start;a.total_pct=(a.equity/a.start-1)*100;
  const ec=S.equity_curve,l=ec[ec.length-1];if(l&&l.live){l.eq=a.equity;l.t=new Date().toISOString()}}
-setInterval(()=>{if(!S||document.hidden)return;status();if(!liveDirty)return;liveDirty=false;applyLive();if(!V||tab==='home')render()},3000);
+let lastR=0;setInterval(()=>{if(!S||document.hidden)return;status();if(!liveDirty&&Date.now()-lastR<15000)return;liveDirty=false;lastR=Date.now();applyLive();render()},3000);
 
 /* ---------- position candles (card charts) ---------- */
 const getJSON=u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw r.status;return r.json()});
