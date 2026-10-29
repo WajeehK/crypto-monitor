@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crypto Trader">
+<title>Crypto Trader</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css?v=6">
+</head><body>
+<div class="bgfx" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i></div>
+<header class="top">
+  <div class="brand"><img src="icon.svg" alt="" class="bi"><b>Crypto Trader</b><span class="mode">PAPER</span>
+    <button class="inst press" id="install" hidden>Install app</button>
+    <span class="live" id="live"><i></i>LIVE</span></div>
+  <div class="meta" id="meta"></div>
+</header>
+<div class="stale" id="stale" hidden></div>
+<div class="nokey" id="nokey" hidden><div class="nkc"><img src="icon-192.png" alt="" width="72" height="72"><h2>Crypto Trader</h2>
+  <p>This monitor's data is end-to-end encrypted. Open your personal link once (the one with <b>#k=</b> at the end) and this device will remember it.</p>
+  <input id="nkin" placeholder="Paste your personal link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pill press" id="nkgo">Unlock</button><p class="mut" id="nkerr"></p></div></div>
+<div class="wire"><span class="wl">LIVE</span><div class="wt"><div class="wtrack" id="wire"></div></div></div>
+
+<main class="wrap" id="main">
+  <section data-view="home">
+    <div class="stats" id="stats"></div>
+    <div class="lbl sec"><span>Open positions</span><span class="cnt" id="npos">0</span></div>
+    <div id="positions"></div>
+    <div class="dash">
+      <div class="panel">
+        <div class="lbl"><span>Equity history</span><span class="mut" id="chartmeta"></span></div>
+        <div class="chart"><svg id="chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg><div class="tag" id="ctag"></div>
+          <span class="ax hi" id="axhi"></span><span class="ax lo" id="axlo"></span></div>
+      </div>
+      <div class="panel">
+        <div class="lbl"><span>Activity</span><button class="lnk press" data-goto="activity">See all →</button></div>
+        <div class="log" id="minilog"></div>
+      </div>
+    </div>
+    <div class="lbl sec"><span>Latest trades</span><button class="lnk press" data-goto="trades">All trades →</button></div>
+    <div class="panel"><div id="latest"></div></div>
+  </section>
+
+  <section data-view="trades" hidden>
+    <div class="lbl sec"><span>Trade history</span><span class="mut" id="tcount"></span></div>
+    <div class="seg" id="tfilter"><span class="sb"></span><button class="on press" data-f="all">All</button><button class="press" data-f="win">Wins</button><button class="press" data-f="loss">Losses</button></div>
+    <div class="panel"><div id="feed"></div></div>
+  </section>
+
+  <section data-view="activity" hidden>
+    <div class="lbl sec"><span>Watcher activity</span><span class="mut">Newest first</span></div>
+    <div class="panel"><div class="log full" id="act"></div></div>
+  </section>
+
+  <section data-view="stats" hidden>
+    <div class="panel np" id="notifPanel">
+      <div class="lbl"><span>Notifications</span><span class="mut" id="npStatus">…</span></div>
+      <div class="kv sw"><span>Push notifications<small>Trade opened, partial close, full close</small></span><button class="tgl press" id="npMain" role="switch" aria-checked="false"><i></i></button></div>
+      <div id="npTypes">
+        <div class="kv sw"><span>🟢 Trade opened</span><button class="tgl press" data-pref="open" role="switch"><i></i></button></div>
+        <div class="kv sw"><span>✂️ Partial close</span><button class="tgl press" data-pref="partial" role="switch"><i></i></button></div>
+        <div class="kv sw"><span>✅ Full close (win / loss)</span><button class="tgl press" data-pref="close" role="switch"><i></i></button></div>
+      </div>
+      <div class="npbtns"><button class="pill press" id="npTest">Send test notification</button></div>
+      <div class="info" id="npInfo">Notifications are sent to this device even when the app is closed.</div>
+    </div>
+    <div id="statsMain"></div></section>
+  <p class="foot">Paper account · Kraken Futures · USD · read-only view of Crypto Trader</p>
+</main>
+
+<div class="sheet" id="iosSheet" hidden><div class="sh-card"><b>Install Crypto Trader</b><p>Tap <span class="kbd">Share</span> <svg viewBox="0 0 24 24" class="ish"><path d="M12 3v12M7 8l5-5 5 5M5 13v7h14v-7"/></svg> in Safari, then <span class="kbd">Add to Home Screen</span>.</p><button class="pill press" id="sheetClose">Got it</button></div></div>
+
+<div class="view" id="view" hidden aria-modal="true" role="dialog">
+  <div class="v-bar" id="vbar"><span class="grab"></span><button class="v-back press" id="vback" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div class="v-title" id="vtitle"></div><span class="live sm" id="vlive"><i></i>LIVE</span></div>
+  <div class="v-body" id="vbody"></div>
+</div>
+<nav class="dock" id="dock" aria-label="Tabs">
+  <span class="bubble" id="bubble"></span>
+  <button class="tb on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg><span>Home</span></button>
+  <button class="tb" data-tab="trades"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Trades</span></button>
+  <button class="tb" data-tab="activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Activity</span></button>
+  <button class="tb" data-tab="stats"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Stats</span></button>
+</nav>
+<script src="lwc.js"></script>
+<script src="chart.js?v=6"></script>
+<script src="app.js?v=6"></script>
+</body></html>

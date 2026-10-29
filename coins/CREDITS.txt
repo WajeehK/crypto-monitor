@@ -1,0 +1,1 @@
+Coin icons: @web3icons/core 4.0.58 (MIT) and cryptocurrency-icons 0.18.1 (CC0-1.0). Logos are trademarks of their projects.
