@@ -252,7 +252,19 @@ function mkChart(el,ref,levels){const c=LightweightCharts.createChart(el,{autoSi
  handleScroll:{vertTouchDrag:false},kineticScroll:{touch:true,mouse:false}});
  const s=c.addCandlestickSeries({upColor:'#00ba7c',downColor:'#f91880',borderVisible:false,wickUpColor:'#00ba7c',wickDownColor:'#f91880',priceFormat:{type:'price',precision:prec(ref),minMove:Math.pow(10,-prec(ref))},
   autoscaleInfoProvider:orig=>{const r=orig();const lv=(typeof levels==='function'?levels():levels||[]).filter(Boolean);if(!r||!lv.length)return r;return {priceRange:{minValue:Math.min(r.priceRange.minValue,...lv),maxValue:Math.max(r.priceRange.maxValue,...lv)},margins:{above:8,below:8}}}});
- return {c,s}}
+ chartExtras(el,c,s,ref);return {c,s}}
+function chartExtras(el,c,s,ref){el.querySelectorAll('.lwfs,.lwtip').forEach(x=>x.remove());
+ const tip=document.createElement('div');tip.className='lwtip';tip.hidden=true;el.appendChild(tip);
+ const fb=document.createElement('button');fb.className='lwfs press';fb.setAttribute('aria-label','Fullscreen');
+ const ico=on=>fb.innerHTML=on?'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>':'<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';ico(0);el.appendChild(fb);
+ let home=null;const exit=()=>{if(!home)return;home[0].insertBefore(el,home[1]);home=null;el.classList.remove('fs');document.body.classList.remove('lwfsopen');ico(0);removeEventListener('popstate',pop)};
+ const pop=()=>exit();
+ fb.onclick=e=>{e.stopPropagation();if(home){exit();return}home=[el.parentNode,el.nextSibling];document.body.appendChild(el);el.classList.add('fs');document.body.classList.add('lwfsopen');ico(1);
+  try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(_){};addEventListener('popstate',pop)};
+ el._exitFs=exit;
+ c.subscribeCrosshairMove(p=>{const d=p&&p.time&&p.seriesData&&p.seriesData.get(s);if(!d||d.open==null){tip.hidden=true;return}
+  const f=v=>v.toFixed(prec(ref||d.close)),ch=(d.close-d.open)/d.open*100;tip.hidden=false;
+  tip.innerHTML=`<span class="mut">${UKfull.format(new Date(p.time*1000))}</span> O <b>${f(d.open)}</b> H <b>${f(d.high)}</b> L <b>${f(d.low)}</b> C <b>${f(d.close)}</b> <b class="${cls(ch)}">${pct(ch)}</b>`})}
 const toBars=a=>(a||[]).map(k=>({time:k[0],open:k[1],high:k[2],low:k[3],close:k[4]}));
 const line=(s,price,title,color,style)=>price&&s.createPriceLine({price,color,lineWidth:1,lineStyle:style??2,axisLabelVisible:true,title});
 const tsec=t=>{const d=pd(t);return ok(d)?Math.floor(d/1000):null};
@@ -415,16 +427,42 @@ $('#mklist').addEventListener('click',e=>{const r=e.target.closest('[data-cid]')
 function renderCoin(id){const c=MK&&MK.coins.find(x=>String(x[0])===String(id));if(!c){vtitle.textContent='Coin';vbody.innerHTML='<div class="empty">Coin not found.</div>';return}
  vtitle.innerHTML=`${esc(c[3])} <span class="mut">${esc(c[2])}</span>`;$('#vlive').hidden=true;
  vbody.innerHTML=`<div class="mkh"><img src="${ICO(c[0])}" alt=""><div><b class="num">${mpx(c[4])}</b><small class="${cls(c[6])}">${pct(c[6])} 24h</small></div><span class="mut">#${c[1]}</span></div>
-  <div class="tfrow"><div class="seg sm" id="ctf"><span class="sb"></span>${['1h','4h','1d'].map((x,i)=>`<button class="press ${i?'':'on'}" data-tf="${x}">${x}</button>`).join('')}</div><span class="mut" style="font-size:13px">Kraken · USD</span></div>
+  <div class="tfrow"><div class="seg sm" id="ctf"><span class="sb"></span>${['15m','1h','4h','1d'].map((x,i)=>`<button class="press ${i!==1?'':'on'}" data-tf="${x}">${x}</button>`).join('')}</div><span class="mut" style="font-size:13px">Kraken · USD</span></div>
   <div class="lwbox" id="cchart"><div class="ld">Loading chart…</div></div>
+  <div class="panel" style="margin-top:14px"><div class="lbl"><span>Price alerts</span><button class="lnk press" id="aladd">+ Set alert</button></div>
+   <div class="alf" id="alf" hidden><input id="alin" type="number" inputmode="decimal" step="any" placeholder="Alert price (USD)"><button class="pill press" id="alok">Save</button></div>
+   <div id="allist"></div><div class="info">Alerts fire while the app is open.</div></div>
   <div class="panel" style="margin-top:14px"><div class="kvg">${cell('1h',pct(c[5]),'',cls(c[5]))}${cell('24h',pct(c[6]),'',cls(c[6]))}${cell('7d',pct(c[7]),'',cls(c[7]))}
   ${cell('Market cap',big(c[8]))}${cell('Volume 24h',big(c[9]))}${cell('Vol/MCap',c[8]?(c[9]/c[8]*100).toFixed(1)+'%':'—')}
   ${cell('Circulating',sup(c[10]))}${cell('Max supply',c[11]?sup(c[11]):'∞')}${cell('Rank','#'+c[1])}</div></div>
   <p class="foot">Market data: CoinMarketCap · updated ${new Date(MK.at*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:TZ})}</p>`;
  let ch=null;const load=async k=>{const el=$('#cchart');try{const d=await ohlc(c[2],k);if(!V||V.arg!==id)return;if(!d.length)throw 0;
-   if(ch)ch.c.remove();el.innerHTML='';ch=mkChart(el,c[4],[]);ch.s.setData(toBars(d));ch.c.timeScale().fitContent()}
+   if(ch){el._exitFs&&el._exitFs();ch.c.remove()}el.innerHTML='';ch=mkChart(el,c[4],()=>ALR.filter(a=>a.cid==id&&!a.hit).map(a=>a.price));ch.s.setData(toBars(d));ch.c.timeScale().fitContent();lines=[];drawAl()}
   catch(_){if(V&&V.arg===id){$('#ctf').parentNode.hidden=true;el.outerHTML='<div class="empty">Not traded on Kraken — stats only.</div>'}}};
- segInit($('#ctf'),b=>load(b.dataset.tf));load('1h');V.cleanup=()=>{if(ch)ch.c.remove();$('#vlive').hidden=false}}
+ let lines=[];const drawAl=()=>{const mine=ALR.filter(a=>a.cid==id);
+  $('#allist').innerHTML=mine.map(a=>`<div class="kv"><span>${a.dir==='above'?'▲ Above':'▼ Below'} <b class="num">${mpx(a.price)}</b>${a.hit?' <small class="up">triggered</small>':''}</span><button class="lnk press" data-ald="${a.id}">Delete</button></div>`).join('')||'<div class="empty" style="padding:12px">No alerts for this coin.</div>';
+  if(ch){lines.forEach(l=>{try{ch.s.removePriceLine(l)}catch(_){}});lines=mine.filter(a=>!a.hit).map(a=>ch.s.createPriceLine({price:a.price,color:'#ffb020',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'🔔'}))}};
+ $('#aladd').onclick=()=>{$('#alf').hidden=!$('#alf').hidden;$('#alin').focus()};
+ $('#alok').onclick=()=>{const v=parseFloat($('#alin').value);if(!(v>0))return;const cur=alPrice[id]||c[4];
+  ALR.push({id:Date.now().toString(36),cid:c[0],sym:c[2],price:v,dir:v>=cur?'above':'below'});alSave();$('#alin').value='';$('#alf').hidden=true;drawAl();
+  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission()};
+ $('#allist').onclick=e=>{const b=e.target.closest('[data-ald]');if(b){ALR=ALR.filter(a=>a.id!==b.dataset.ald);alSave();drawAl()}};
+ drawAl();V.redrawAl=drawAl;
+ segInit($('#ctf'),b=>load(b.dataset.tf));load('1h');V.cleanup=()=>{const e=$('#cchart');e&&e._exitFs&&e._exitFs();if(ch)ch.c.remove();$('#vlive').hidden=false}}
+/* price alerts: checked every 30s while the app is open (Kraken ticker, else markets.json price) */
+let ALR=[];try{ALR=JSON.parse(localStorage.getItem('ct_alerts')||'[]')}catch(_){}
+const alPrice={};const alSave=()=>localStorage.setItem('ct_alerts',JSON.stringify(ALR));
+function toast(t){let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';document.body.appendChild(el)}el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),6000)}
+async function alCheck(){const act=ALR.filter(a=>!a.hit);if(!act.length)return;
+ for(const cid of new Set(act.map(a=>a.cid))){const a0=act.find(a=>a.cid===cid);let p=null;
+  try{const j=await (await fetch('https://api.kraken.com/0/public/Ticker?pair='+spotPair(a0.sym))).json();const k=j.result&&Object.keys(j.result)[0];if(k)p=+j.result[k].c[0]}catch(_){}
+  if(!(p>0)){const m=MK&&MK.coins.find(x=>x[0]===cid);if(m)p=m[4]}
+  if(!(p>0))continue;alPrice[cid]=p;
+  for(const a of act.filter(a=>a.cid===cid))if(a.dir==='above'?p>=a.price:p<=a.price){a.hit=Date.now();
+   const msg=`${a.sym} ${a.dir==='above'?'rose above':'fell below'} ${mpx(a.price)} — now ${mpx(p)}`;toast('🔔 '+msg);
+   try{if(Notification.permission==='granted')(await navigator.serviceWorker.ready).showNotification('Price alert: '+a.sym,{body:msg,tag:'alert-'+a.id,icon:'icon-192.png',badge:'badge-96.png'})}catch(_){}}}
+ alSave();if(V&&V.redrawAl)V.redrawAl()}
+setInterval(()=>{if(!document.hidden)alCheck()},30000);setTimeout(alCheck,3000);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
 window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook
