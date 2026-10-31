@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=6">
+<link rel="stylesheet" href="app.css?v=7">
 </head><body>
 <div class="bgfx" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i></div>
 <header class="top">
@@ -55,6 +55,14 @@
     <div class="panel"><div id="feed"></div></div>
   </section>
 
+  <section data-view="markets" hidden>
+    <div class="lbl sec"><span>Markets</span><span class="mut" id="mkupd"></span></div>
+    <div class="mkg" id="mkglob"></div>
+    <input class="mkq" id="mkq" type="search" placeholder="Search coins" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="seg sm" id="mksort"><span class="sb"></span><button class="on press" data-s="rank">Rank</button><button class="press" data-s="ch">24h %</button><button class="press" data-s="price">Price</button><button class="press" data-s="vol">Volume</button></div>
+    <div class="panel"><div id="mklist"></div></div>
+  </section>
+
   <section data-view="activity" hidden>
     <div class="lbl sec"><span>Watcher activity</span><span class="mut">Newest first</span></div>
     <div class="panel"><div class="log full" id="act"></div></div>
@@ -86,10 +94,11 @@
   <span class="bubble" id="bubble"></span>
   <button class="tb on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg><span>Home</span></button>
   <button class="tb" data-tab="trades"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Trades</span></button>
+  <button class="tb" data-tab="markets"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.6-1-1.7-1.4-3-1.4-1.7 0-2.8.8-2.8 2s1 1.7 2.8 2.1 3 .9 3 2.2-1.3 2.1-3 2.1c-1.4 0-2.6-.5-3.2-1.5M12 6v1.8M12 16.2V18"/></svg><span>Markets</span></button>
   <button class="tb" data-tab="activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Activity</span></button>
   <button class="tb" data-tab="stats"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Stats</span></button>
 </nav>
 <script src="lwc.js"></script>
-<script src="chart.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="chart.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body></html>

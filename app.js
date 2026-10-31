@@ -4,7 +4,7 @@ const REPO='WajeehK/crypto-monitor',RAW='https://raw.githubusercontent.com/'+REP
 (()=>{const m=location.hash.match(/(?:^#|&)k=([A-Za-z0-9_-]{43})/);if(m){localStorage.setItem('ct_k',m[1]);history.replaceState(null,'',location.pathname+location.search)}})();
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s), REFRESH=5000, TZ='Europe/London';
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const TABS=['home','trades','activity','stats'];
+const TABS=['home','trades','markets','activity','stats'];
 let S=null, tab='home', filt='all', failed=0, tf={}, charts={}, posData={}, ICONS=new Set();
 fetch('coins/index.json',{credentials:'same-origin'}).then(r=>r.json()).then(a=>{ICONS=new Set(a);if(S)render()}).catch(()=>{});
 const ci=(c,sz)=>{c=String(c||'?');const l=c.toLowerCase(),st=sz?` style="--s:${sz}px"`:'';return ICONS.has(l)?`<img class="ci" src="coins/${l}.svg" alt=""${st}>`:`<span class="ci lt"${st}>${esc(c.slice(0,1))}</span>`};
@@ -64,7 +64,7 @@ function go(t,dirHint){const from=TABS.indexOf(tab),to=TABS.indexOf(t);const dir
  bs.set(slotX(to));if(t===tab){return}tab=t;
  $$('[data-view]').forEach(s=>{s.hidden=s.dataset.view!==t});
  const sec=$(`[data-view="${t}"]`);if(!RM&&sec.animate)sec.animate([{transform:`translate3d(${dir*28}px,0,0)`,opacity:0},{transform:'none',opacity:1}],{duration:380,easing:'cubic-bezier(.2,.9,.25,1)'});
- scrollTo({top:0});requestAnimationFrame(()=>sec.querySelectorAll('.seg').forEach(segMove));if(t==='home')drawCharts();}
+ scrollTo({top:0});requestAnimationFrame(()=>sec.querySelectorAll('.seg').forEach(segMove));if(t==='home')drawCharts();if(t==='markets')mkLoad();}
 $$('[data-goto]').forEach(b=>b.onclick=()=>go(b.dataset.goto));
 
 /* ---------- segmented controls ---------- */
@@ -204,7 +204,7 @@ let lastR=0;setInterval(()=>{if(!S||document.hidden)return;status();if(!liveDirt
 
 /* ---------- position candles (card charts) ---------- */
 const getJSON=u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw r.status;return r.json()});
-const OHLC={'1m':[1,5*3600],'5m':[5,24*3600],'15m':[15,3*86400],'1h':[60,12*86400]};
+const OHLC={'1d':[1440,720*86400],'4h':[240,120*86400],'1m':[1,5*3600],'5m':[5,24*3600],'15m':[15,3*86400],'1h':[60,12*86400]};
 async function ohlc(coin,k){const [iv,span]=OHLC[k];const j=await (await fetch(`https://api.kraken.com/0/public/OHLC?pair=${spotPair(coin)}&interval=${iv}&since=${Math.floor(Date.now()/1000)-span}`)).json();
  if(j.error&&j.error.length)throw new Error(j.error[0]);const key=Object.keys(j.result||{}).find(x=>x!=='last');return (j.result[key]||[]).map(c=>[c[0],+c[1],+c[2],+c[3],+c[4]])}
 function loadPosData(force,only){if(!S)return;S.positions.forEach(p=>{if(only&&p.symbol!==only)return;const d=posData[p.symbol]||(posData[p.symbol]={tf:{},_at:0});
@@ -219,14 +219,14 @@ function openView(kind,arg,fromHistory){
  closeViewNow();V={kind,arg};document.body.classList.add('vopen');view.hidden=false;
  const H=innerHeight;vs.x=H;vs.v=0;view.style.transform=`translate3d(0,${H}px,0)`;requestAnimationFrame(()=>vs.set(0));
  if(!fromHistory)history.pushState({v:kind,a:arg},'',`#${kind}/${encodeURIComponent(arg)}`);
- if(kind==='trade')renderTrade(arg);else renderPosView(arg)}
+ if(kind==='trade')renderTrade(arg);else if(kind==='coin')renderCoin(arg);else renderPosView(arg)}
 function closeViewNow(){if(V&&V.cleanup)V.cleanup();V=null}
 function dismiss(fromHistory){if(!V)return;const H=innerHeight;closeViewNow();
  const done=()=>{if(!V){view.hidden=true;vbody.innerHTML='';document.body.classList.remove('vopen')}};
  if(RM){vs.set(H,true);done()}else{vs.set(H);setTimeout(done,420)}
  if(!fromHistory&&location.hash)history.back()}
 $('#vback').onclick=()=>dismiss();
-addEventListener('popstate',()=>{const m=location.hash.match(/^#(trade|pos)\/(.+)$/);if(m)openView(m[1],decodeURIComponent(m[2]),true);else dismiss(true)});
+addEventListener('popstate',()=>{const m=location.hash.match(/^#(trade|pos|coin)\/(.+)$/);if(m)openView(m[1],decodeURIComponent(m[2]),true);else dismiss(true)});
 addEventListener('keydown',e=>{if(e.key==='Escape')dismiss()});
 // drag the top bar down to close (follows the finger, springs back or dismisses)
 (()=>{const bar=$('#vbar');let d=null;
@@ -343,7 +343,7 @@ function renderPosView(sym){
  V.cleanup=()=>{clearInterval(iv);clearInterval(iv2);if(ch)ch.c.remove()};
 }
 // open from a deep link (#trade/ID or #pos/SYM) once data has arrived
-let deep=location.hash.match(/^#(trade|pos)\/(.+)$/);
+let deep=location.hash.match(/^#(trade|pos|coin)\/(.+)$/);
 
 /* ---------- install ---------- */
 let deferred=null;const inst=$('#install');
@@ -389,6 +389,42 @@ addEventListener('online',()=>{netFail=0;tick()});addEventListener('offline',sta
 (async()=>{if(!await loadKey()){showNoKey();return}
  const c=localStorage.getItem('ct_cache');if(c)try{accept(JSON.parse(c),true)}catch(_){}
  status();tick();setInterval(tick,REFRESH)})();
+/* ---------- Markets tab (CoinMarketCap data, refreshed on the box every 10 min -> data/markets.json) ---------- */
+let MK=null,mkSort='rank',mkQ='',mkAt=0;
+try{MK=JSON.parse(localStorage.getItem('ct_mk')||'null')}catch(_){}
+const big=v=>v==null?'—':'$'+(v>=1e12?(v/1e12).toFixed(2)+'T':v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(2)+'M':v.toLocaleString('en-GB'));
+const sup=v=>v==null?'—':v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(2)+'M':v.toLocaleString('en-GB');
+const mpx=v=>v==null?'—':'$'+(v>=1?v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}):v.toPrecision(4));
+const ICO=id=>`https://s2.coinmarketcap.com/static/img/coins/64x64/${id}.png`;
+async function mkLoad(force){if(!force&&Date.now()-mkAt<110000){mkRender();return}mkAt=Date.now();
+ try{const r=await fetch(RAW+'data/markets.json?t='+Math.floor(Date.now()/120000),{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.coins&&(!MK||j.at>=MK.at)){MK=j;localStorage.setItem('ct_mk',JSON.stringify(j))}}}catch(_){}
+ mkRender()}
+setInterval(()=>{if(tab==='markets'&&!document.hidden)mkLoad()},30000);
+function mkRender(){const g=$('#mkglob'),L=$('#mklist');if(!MK||!MK.coins){L.innerHTML='<div class="empty">Loading markets…</div>';return}
+ const G=MK.global||{},F=MK.fng;
+ g.innerHTML=`<div><span>Market cap</span><b>${big(G.mcap)}</b><small class="${cls(G.mcap24)}">${pct(G.mcap24)}</small></div><div><span>24h volume</span><b>${big(G.vol)}</b><small class="${cls(G.vol24)}">${pct(G.vol24)}</small></div><div><span>BTC dom.</span><b>${G.btc??'—'}%</b><small>ETH ${G.eth??'—'}%</small></div>`+(F?`<div><span>Fear &amp; Greed</span><b style="color:hsl(${F.v*1.2},80%,55%)">${F.v}</b><small>${esc(F.c)}</small></div>`:'');
+ $('#mkupd').textContent='Updated '+new Date(MK.at*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+ const q=mkQ.toLowerCase();let a=MK.coins.filter(c=>!q||c[2].toLowerCase().includes(q)||c[3].toLowerCase().includes(q));
+ const si={rank:1,price:4,ch:6,vol:9}[mkSort];a=a.slice().sort((x,y)=>mkSort==='rank'?x[1]-y[1]:(y[si]??-1e18)-(x[si]??-1e18));
+ L.innerHTML=a.map(c=>`<div class="mkr press" data-cid="${c[0]}"><span class="mkn mut">${c[1]}</span><img class="mki" loading="lazy" src="${ICO(c[0])}" alt=""><div class="mkc"><b>${esc(c[2])}</b><small>${big(c[8])}</small></div>
+  <img class="mks" loading="lazy" src="https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${c[0]}.svg" alt="" onerror="this.style.visibility='hidden'" style="filter:${(c[7]||0)>=0?'hue-rotate(0)':'none'}">
+  <div class="mkp"><b class="num">${mpx(c[4])}</b><small class="${cls(c[6])}">${pct(c[6])}</small></div></div>`).join('')||'<div class="empty">No coins match.</div>'}
+$('#mkq').addEventListener('input',e=>{mkQ=e.target.value.trim();mkRender()});
+segInit($('#mksort'),b=>{mkSort=b.dataset.s;mkRender()});
+$('#mklist').addEventListener('click',e=>{const r=e.target.closest('[data-cid]');if(r)openView('coin',r.dataset.cid)});
+function renderCoin(id){const c=MK&&MK.coins.find(x=>String(x[0])===String(id));if(!c){vtitle.textContent='Coin';vbody.innerHTML='<div class="empty">Coin not found.</div>';return}
+ vtitle.innerHTML=`${esc(c[3])} <span class="mut">${esc(c[2])}</span>`;$('#vlive').hidden=true;
+ vbody.innerHTML=`<div class="mkh"><img src="${ICO(c[0])}" alt=""><div><b class="num">${mpx(c[4])}</b><small class="${cls(c[6])}">${pct(c[6])} 24h</small></div><span class="mut">#${c[1]}</span></div>
+  <div class="tfrow"><div class="seg sm" id="ctf"><span class="sb"></span>${['1h','4h','1d'].map((x,i)=>`<button class="press ${i?'':'on'}" data-tf="${x}">${x}</button>`).join('')}</div><span class="mut" style="font-size:13px">Kraken · USD</span></div>
+  <div class="lwbox" id="cchart"><div class="ld">Loading chart…</div></div>
+  <div class="panel" style="margin-top:14px"><div class="kvg">${cell('1h',pct(c[5]),'',cls(c[5]))}${cell('24h',pct(c[6]),'',cls(c[6]))}${cell('7d',pct(c[7]),'',cls(c[7]))}
+  ${cell('Market cap',big(c[8]))}${cell('Volume 24h',big(c[9]))}${cell('Vol/MCap',c[8]?(c[9]/c[8]*100).toFixed(1)+'%':'—')}
+  ${cell('Circulating',sup(c[10]))}${cell('Max supply',c[11]?sup(c[11]):'∞')}${cell('Rank','#'+c[1])}</div></div>
+  <p class="foot">Market data: CoinMarketCap · updated ${new Date(MK.at*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:TZ})}</p>`;
+ let ch=null;const load=async k=>{const el=$('#cchart');try{const d=await ohlc(c[2],k);if(!V||V.arg!==id)return;if(!d.length)throw 0;
+   if(ch)ch.c.remove();el.innerHTML='';ch=mkChart(el,c[4],[]);ch.s.setData(toBars(d));ch.c.timeScale().fitContent()}
+  catch(_){if(V&&V.arg===id){$('#ctf').parentNode.hidden=true;el.outerHTML='<div class="empty">Not traded on Kraken — stats only.</div>'}}};
+ segInit($('#ctf'),b=>load(b.dataset.tf));load('1h');V.cleanup=()=>{if(ch)ch.c.remove();$('#vlive').hidden=false}}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
 window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook
