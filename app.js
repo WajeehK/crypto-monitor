@@ -102,7 +102,7 @@ function renderPositions(){
  if(box.dataset.k!==keys){box.dataset.k=keys;charts={};
   box.innerHTML=S.positions.map(p=>`<article class="pos" data-sym="${esc(p.symbol)}"><div class="pos-h"></div>
    <div class="seg sm tfseg"><span class="sb"></span><button class="press ${tf[p.symbol]!=='1m'?'on':''}" data-tf="5m">5m</button><button class="press ${tf[p.symbol]==='1m'?'on':''}" data-tf="1m">1m</button></div>
-   <div class="pchart"><canvas></canvas></div><div class="pos-b"></div></article>`).join('');
+   <div class="pchart"><canvas></canvas></div><div class="pos-b"></div><div class="sellrow"><button class="sellb press" data-sell="${esc(p.symbol)}">Sell</button></div></article>`).join('');
   box.querySelectorAll('.pos').forEach(el=>{const sym=el.dataset.sym;charts[sym]=PosChart(el.querySelector('canvas'));segInit(el.querySelector('.seg'),b=>{tf[sym]=b.dataset.tf;drawCharts()})})}
  S.positions.forEach(p=>{const el=box.querySelector(`.pos[data-sym="${p.symbol}"]`);if(!el)return;const h=posInfo(p);el.querySelector('.pos-h').innerHTML=h.head;el.querySelector('.pos-b').innerHTML=h.body});
  drawCharts()}
@@ -463,6 +463,27 @@ async function alCheck(){const act=ALR.filter(a=>!a.hit);if(!act.length)return;
    try{if(Notification.permission==='granted')(await navigator.serviceWorker.ready).showNotification('Price alert: '+a.sym,{body:msg,tag:'alert-'+a.id,icon:'icon-192.png',badge:'badge-96.png'})}catch(_){}}}
  alSave();if(V&&V.redrawAl)V.redrawAl()}
 setInterval(()=>{if(!document.hidden)alCheck()},30000);setTimeout(alCheck,3000);
+/* ---------- Sell button: signed close request -> box (Tailscale Funnel /cm) -> close-requests/<id>.json -> Crypto Trader ---------- */
+const BOX='https://crypto-box.tailc9dc5b.ts.net/cm';
+async function hsig(msg){const raw=Uint8Array.from(atob(localStorage.getItem('ct_k').replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
+ const k=await crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+ return [...new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)))].map(b=>b.toString(16).padStart(2,'0')).join('')}
+function sellDlg(p){const d=document.createElement('div');d.className='sheet sellsh';
+ d.innerHTML=`<div class="sh-card"><b>Close ${esc(p.symbol)} ${esc(p.side)} at market?</b><p>Stop/TP will be cancelled.<br><span class="mut">Entry ${px(p.entry)} · size ${qty(p.size)}</span></p><p class="sellst" id="sellst"></p>
+  <div class="sellbtns"><button class="pill ghost press" id="sellno">Cancel</button><button class="pill sellgo press" id="sellok">Sell</button></div></div>`;
+ document.body.appendChild(d);const st=d.querySelector('#sellst'),ok=d.querySelector('#sellok'),no=d.querySelector('#sellno');let busy=false;
+ no.onclick=()=>{if(!busy)d.remove();else{d.remove()}};
+ ok.onclick=async()=>{if(busy)return;busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
+  try{const pl=JSON.stringify({pair:p.symbol,side:p.side,entry_price:p.entry,ts:Date.now()/1000,nonce:crypto.getRandomValues(new Uint32Array(2)).join('-')});
+   const r=await fetch(BOX+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({p:pl,s:await hsig(pl)})});const j=await r.json();
+   if(!r.ok||!j.id)throw new Error(j.error||('HTTP '+r.status));st.textContent='Sent. Waiting for Crypto Trader…';ok.textContent='Pending…';
+   const t0=Date.now();while(Date.now()-t0<60000){await new Promise(x=>setTimeout(x,2000));if(!d.isConnected)return;
+    try{const q=await (await fetch(BOX+'/close/'+j.id,{cache:'no-store'})).json();
+     if(q.status==='closed'){st.innerHTML=`<b class="up">Closed at $${px(q.exit_price)}, P&amp;L <span class="${cls(q.pnl)}">${usd(q.pnl,1)}</span></b>`;ok.textContent='Done';return}
+     if(q.status==='rejected'){st.innerHTML=`<b class="dn">Rejected: ${esc(q.reason||'no reason given')}</b>`;ok.textContent='Rejected';return}}catch(_){}}
+   st.innerHTML='<b class="warn">No response yet, Crypto Trader may be offline.</b>';ok.textContent='No response'}
+  catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
+$('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
 window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook
