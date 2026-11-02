@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=9">
+<link rel="stylesheet" href="app.css?v=10">
 </head><body>
 <div class="bgfx" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i></div>
 <header class="top">
@@ -25,8 +25,8 @@
 </header>
 <div class="stale" id="stale" hidden></div>
 <div class="nokey" id="nokey" hidden><div class="nkc"><img src="icon-192.png" alt="" width="72" height="72"><h2>Crypto Trader</h2>
-  <p>This monitor's data is end-to-end encrypted. Open your personal link once (the one with <b>#k=</b> at the end) and this device will remember it.</p>
-  <input id="nkin" placeholder="Paste your personal link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pill press" id="nkgo">Unlock</button><p class="mut" id="nkerr"></p></div></div>
+  <p>Enter your password to unlock. This device will be remembered for 7 days.</p>
+  <input id="nkin" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="off" spellcheck="false"><button class="pill press" id="nkgo">Unlock</button><p class="mut" id="nkerr"></p></div></div>
 <div class="wire"><span class="wl">LIVE</span><div class="wt"><div class="wtrack" id="wire"></div></div></div>
 
 <main class="wrap" id="main">
@@ -80,7 +80,8 @@
       <div class="npbtns"><button class="pill press" id="npTest">Send test notification</button></div>
       <div class="info" id="npInfo">Notifications are sent to this device even when the app is closed.</div>
     </div>
-    <div id="statsMain"></div></section>
+    <div id="statsMain"></div>
+    <div class="panel" style="margin-top:14px"><div class="kv"><span>This device<small id="lkuntil" style="display:block;color:var(--mu);font-size:12.5px"></small></span><button class="pill ghost press" id="lockbtn">Lock</button></div></div></section>
   <p class="foot">Paper account · Kraken Futures · USD · read-only view of Crypto Trader</p>
 </main>
 
@@ -99,6 +100,6 @@
   <button class="tb" data-tab="stats"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Stats</span></button>
 </nav>
 <script src="lwc.js"></script>
-<script src="chart.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="chart.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body></html>

@@ -1,7 +1,7 @@
 (()=>{
 // GitHub Pages build: bot data comes AES-256-GCM encrypted from the repo's `data` branch; prices come live from Kraken.
 const REPO='WajeehK/crypto-monitor',RAW='https://raw.githubusercontent.com/'+REPO+'/';
-(()=>{const m=location.hash.match(/(?:^#|&)k=([A-Za-z0-9_-]{43})/);if(m){localStorage.setItem('ct_k',m[1]);history.replaceState(null,'',location.pathname+location.search)}})();
+(()=>{const m=location.hash.match(/(?:^#|&)k=([A-Za-z0-9_-]{43})/);if(m){localStorage.setItem('ct_k',m[1]);localStorage.setItem('ct_kexp',Date.now()+7*864e5);history.replaceState(null,'',location.pathname+location.search)}})();
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s), REFRESH=5000, TZ='Europe/London';
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS=['home','trades','markets','activity','stats'];
@@ -146,7 +146,9 @@ function render(){
 /* ---------- encrypted bot data from GitHub ---------- */
 let KEY=null,BLOB=null,lastSlot=0,lastApi=0,lastSha='',netFail=0;const tried=new Set(),tradeMem={};
 const b64u=x=>Uint8Array.from(atob(x.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-x.length%4)%4)),c=>c.charCodeAt(0));
-async function loadKey(){const k=localStorage.getItem('ct_k');if(!k)return false;try{KEY=await crypto.subtle.importKey('raw',b64u(k),'AES-GCM',false,['decrypt']);return true}catch(e){return false}}
+const WEEK=7*864e5;function lockDevice(){['ct_k','ct_kexp','ct_cache'].forEach(x=>localStorage.removeItem(x));location.reload()}
+async function loadKey(){const k=localStorage.getItem('ct_k');if(!k)return false;const ex=+localStorage.getItem('ct_kexp')||0;
+ if(!ex)localStorage.setItem('ct_kexp',Date.now()+WEEK);else if(Date.now()>ex){['ct_k','ct_kexp','ct_cache'].forEach(x=>localStorage.removeItem(x));return false}try{KEY=await crypto.subtle.importKey('raw',b64u(k),'AES-GCM',false,['decrypt']);return true}catch(e){return false}}
 async function dec(buf){const u=new Uint8Array(buf);if(u[0]!==67||u[1]!==84||u[2]!==49)throw new Error('bad format');
  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:u.slice(3,15),additionalData:new TextEncoder().encode('ctmon')},KEY,u.slice(15));
  return JSON.parse(await new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream('gzip'))).text())}
@@ -155,10 +157,17 @@ function accept(b,fromCache){if(!b||!b.state)return;if(BLOB&&b.pushed_at<=BLOB.p
  if(!fromCache)try{localStorage.setItem('ct_cache',JSON.stringify(b))}catch(_){}
  S=JSON.parse(JSON.stringify(b.state));S.push=b.push;S.tmap=b.tmap||{};S.pushed_at=b.pushed_at;wsEnsure();applyLive();render();
  if(deep){const m=deep;deep=null;history.replaceState(null,'',location.pathname+location.search);openView(m[1],decodeURIComponent(m[2]))}}
-function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_cache');showNoKey('That key does not unlock this data. Paste your personal link again.')}
-function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';
- $('#nkgo').onclick=()=>{const m=$('#nkin').value.match(/k=([A-Za-z0-9_-]{43})/)||$('#nkin').value.trim().match(/^([A-Za-z0-9_-]{43})$/);if(!m){$('#nkerr').textContent='That does not look like your personal link.';return}
-  localStorage.setItem('ct_k',m[1]);location.reload()}}
+function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_cache');showNoKey('Saved key no longer works. Enter your password again.')}
+function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';const inp=$('#nkin'),btn=$('#nkgo');setTimeout(()=>inp.focus(),50);
+ const go=async()=>{const pw=inp.value;if(!pw||btn.disabled)return;btn.disabled=true;btn.textContent='Unlocking…';$('#nkerr').textContent='';
+  try{const w=await (await fetch('keywrap.json',{cache:'no-store'})).json();
+   const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+   const kek=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64u(w.salt),iterations:w.iter},base,{name:'AES-GCM',length:256},false,['decrypt']);
+   const raw=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64u(w.iv),additionalData:new TextEncoder().encode('ctmon-keywrap')},kek,b64u(w.ct)));
+   localStorage.setItem('ct_k',btoa(String.fromCharCode(...raw)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''));localStorage.setItem('ct_kexp',Date.now()+WEEK);location.reload()}
+  catch(e){inp.value='';$('#nkerr').textContent=e&&e.name==='OperationError'?'Wrong password':"Couldn't check the password — are you online?";btn.textContent='Wait…';
+   setTimeout(()=>{btn.disabled=false;btn.textContent='Unlock';inp.focus()},2000)}};
+ btn.onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()}}
 async function tick(){if(!KEY||(document.hidden&&BLOB))return;const now=Date.now()/1000,slot=Math.floor((now-15)/60);
  try{
   // a new file path every minute (s/<unix-minute>.bin) -> GitHub's raw CDN serves it fresh
@@ -483,6 +492,7 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
      if(q.status==='rejected'){st.innerHTML=`<b class="dn">Rejected: ${esc(q.reason||'no reason given')}</b>`;ok.textContent='Rejected';return}}catch(_){}}
    st.innerHTML='<b class="warn">No response yet, Crypto Trader may be offline.</b>';ok.textContent='No response'}
   catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
+(()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
 $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
