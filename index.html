@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="app.css?v=19">
 </head><body>
 <div id="spl" aria-hidden="true"><div class="sc" id="sc">
-<svg class="sc-svg" viewBox="0 0 360 420"><g id="sccd"></g><path id="scp" d="M120 352 C160 350 168 318 196 312 S232 296 246 262 S278 222 292 196 S318 150 330 128" pathLength="1"/><circle id="scdot" style="opacity:0" r="3.5" cx="330" cy="128"/></svg>
+<svg class="sc-svg" viewBox="0 0 360 420"><g id="sccd"></g><path id="scp" style="opacity:0" d="M120 352 C160 350 168 318 196 312 S232 296 246 262 S278 222 292 196 S318 150 330 128" pathLength="1"/><circle id="scdot" style="opacity:0" r="3.5" cx="330" cy="128"/></svg>
 <div class="sc-z" id="scz"><i>z</i><i>z</i><i>z</i></div><div class="sc-cdl" id="sccdl"><i></i></div>
 <div class="spm" id="spm"><div class="spb" id="spb"><div class="sp-logo mwrap m-sleepy" id="splm"><svg class="mas" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="mgB" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#fff"/><stop offset=".65" stop-color="#dfe3ea"/><stop offset="1" stop-color="#9aa3b2"/></radialGradient></defs><circle cx="50" cy="54" r="40" fill="url(#mgB)" stroke="none"/><g class="m-eyes"><ellipse class="m-e" cx="40" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><ellipse class="m-e" cx="60" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><path class="m-h" d="M34 54 Q40 45 46 54 M54 54 Q60 45 66 54" stroke="#0b0e14" stroke-width="4"/><path class="m-s" d="M34 54 Q40 58 46 54 M54 54 Q60 58 66 54" stroke="#0b0e14" stroke-width="3.5"/><path class="m-w" d="M33 41 L45 44 M67 41 L55 44" stroke="#0b0e14" stroke-width="3"/></g><g class="m-cap"><path d="M14 36 Q30 6 70 14 Q86 18 90 30 Q60 22 14 36Z" fill="#3b82f6" stroke="none"/><circle cx="90" cy="30" r="6" fill="#fff" stroke="none"/><path d="M12 36 Q50 22 86 28" stroke="#e8ecf3" stroke-width="5"/></g></svg></div></div></div>
 <div class="sc-sh" id="scsh"></div>
@@ -61,7 +61,7 @@ function f(now){if(!t0)t0=now;var t=now-t0,x=SX,y=SY,rot=0,sx=1,sy=1;
  if(t>=1000&&t<1350){if(mood==='sleepy')setMood('calm');var j=(t-1000)/350;y-=Math.sin(j*Math.PI)*26;sy=1+Math.sin(j*Math.PI)*.12;sx=1-Math.sin(j*Math.PI)*.08;rot=-6*Math.sin(j*Math.PI)}
  if(t>=1050&&!capGone){capGone=1;cap.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:'translate(70px,-90px) rotate(260deg)',opacity:1,offset:.6},{transform:'translate(110px,40px) rotate(420deg)',opacity:0}],{duration:800,easing:'cubic-bezier(.2,.7,.4,1)',fill:'forwards'})}
  if(t>=1350&&t<1500){var q=(t-1350)/150;sy=1-Math.sin(q*Math.PI)*.16;sx=1+Math.sin(q*Math.PI)*.12}
- var r=cl((t-1500)/850);P.style.strokeDashoffset=1-r;
+ var r=cl((t-1500)/850);P.style.strokeDashoffset=1-r;P.style.opacity=r>0?1:0;
  if(t>=1500&&t<2350){var e=eio(r),p=P.getPointAtLength(L*e),p2=P.getPointAtLength(Math.min(L,L*e+2));x=p.x;y=p.y;rot=Math.atan2(p2.y-p.y,p2.x-p.x)*57.3*.8;
   if(now-lastSpark>45){lastSpark=now;spark(x-8,y-4)}}
  CS.forEach(function(g,i){var k=cl((t-1550-i*95)/320);g.style.transform='scaleY('+back(k)+')';g.style.opacity=k?1:0});
