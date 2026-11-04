@@ -127,13 +127,25 @@ function todayHTML(a){const m0=ldnMidnight(),tt=x=>Date.parse(String(x||'').repl
  let eq0=a.start;for(const e of S.equity_curve||[]){if(!e.live&&tt(e.t)<m0)eq0=e.eq}
  const eq=a.equity??eq0,d=eq-eq0,u=d-real,pc=eq0?d/eq0*100:0,c=d>=0?'#00ba7c':'#f91880';
  return `<div class="st wide" style="--c:${c}"><div class="k">Today's return</div><div class="v ${cls(d)}">${usd(d,1)} <span class="tp">${pct(pc)}</span></div><div class="s">realised ${usd(real,1)} · unrealised ${usd(u,1)} · ${tr.length} trade${tr.length==1?'':'s'} today</div></div>`}
+let FNG=null;try{FNG=JSON.parse(localStorage.getItem('ct-fng')||'null')}catch(e){}
+function fngCol(v){return v<25?'#f91880':v<45?'#ff7a45':v<55?'#ffd400':v<75?'#7ed957':'#00ba7c'}
+function fngHTML(){if(!FNG)return `<div class="st fng" id="fng" style="--c:#71767b"><div class="k">Fear &amp; Greed</div><div class="v mut">—</div><div class="s">loading…</div></div>`;
+ const v=FNG.v,c=fngCol(v),d=FNG.p==null?null:v-FNG.p,ang=-90+v*1.8;
+ return `<div class="st fng" id="fng" style="--c:${c}"><div class="k">Fear &amp; Greed</div>
+ <svg class="gauge" viewBox="0 0 100 56"><defs><linearGradient id="fg" x1="0" x2="1"><stop offset="0" stop-color="#f91880"/><stop offset=".3" stop-color="#ff7a45"/><stop offset=".5" stop-color="#ffd400"/><stop offset=".7" stop-color="#7ed957"/><stop offset="1" stop-color="#00ba7c"/></linearGradient></defs>
+ <path d="M8 50 A42 42 0 0 1 92 50" fill="none" stroke="url(#fg)" stroke-width="7" stroke-linecap="round" opacity=".9"/>
+ <g class="needle" style="--a:${ang}deg"><line x1="50" y1="50" x2="50" y2="14" stroke="#e7e9ea" stroke-width="2.5" stroke-linecap="round"/></g><circle cx="50" cy="50" r="4" fill="#e7e9ea"/></svg>
+ <div class="v" style="color:${c}">${v} <span class="tp">${esc(FNG.c)}</span></div><div class="s">${d==null?'':(d>0?'+':d<0?'−':'±')+Math.abs(d)+' vs yesterday'}</div></div>`}
+async function loadFng(){if(FNG&&Date.now()-FNG.at<6e5)return;try{const r=await fetch('https://api.alternative.me/fng/?limit=2',{cache:'no-store'}),j=await r.json(),d=j.data;
+ FNG={v:+d[0].value,c:d[0].value_classification,p:d[1]?+d[1].value:null,at:Date.now()};localStorage.setItem('ct-fng',JSON.stringify(FNG));const el=$('#fng');if(el)el.outerHTML=fngHTML()}catch(e){}}
+loadFng();setInterval(loadFng,6e5);
 function render(){
  if(!S)return;fixHealth();const a=S.account,h=S.health;
  const age=h.age_s==null?'?':h.age_s<90?Math.round(h.age_s)+'s':Math.round(h.age_s/60)+'m';
  $('#meta').innerHTML=`<span>Heartbeat <b class="${h.stale?'bad':''}">${age} ago${h.stale?' · STALE':''}</b></span><span>Cycle <b>${h.cycle_ms??'—'} ms</b></span><span>Mode <b>${esc(h.mode||'—')}</b></span><span>Errors <b class="${h.errors?'bad':''}">${h.errors??'—'}</b></span><span>PID <b>${h.pid??'—'}</b></span>`;
  $('#stats').innerHTML=[['Equity (est)',usd(a.equity),'started at '+usd(a.start),'#1d9bf0',''],['Total P&L',usd(a.total_pnl,1),pct(a.total_pct),a.total_pnl>=0?'#00ba7c':'#f91880',cls(a.total_pnl)],
-  ['Win rate',a.win_rate==null?'—':a.win_rate.toFixed(1)+'%',`${a.wins} wins · ${a.trades-a.wins} losses`,'#a78bfa',''],['Unrealised',usd(a.upnl,1),`realised ${usd(a.realised,1)}`,a.upnl>=0?'#00ba7c':'#f91880',cls(a.upnl)]]
-  .map(([k,v,s,c,cl])=>`<div class="st" style="--c:${c}"><div class="k">${k}</div><div class="v ${cl}">${v}</div><div class="s">${s}</div></div>`).join('')+todayHTML(a);
+  ['Win rate',a.win_rate==null?'—':a.win_rate.toFixed(1)+'%',`${a.wins} wins · ${a.trades-a.wins} losses`,'#a78bfa',''],]
+  .map(([k,v,s,c,cl])=>`<div class="st" style="--c:${c}"><div class="k">${k}</div><div class="v ${cl}">${v}</div><div class="s">${s}</div></div>`).join('')+'<div class="st fng" id="fng"></div>'+todayHTML(a);$('#fng').outerHTML=fngHTML();
  $('#npos').textContent=S.positions.length;loadPosData();renderPositions();chart(S.equity_curve,a.start);
  $('#minilog').innerHTML=S.activity.slice(0,8).map(logHTML).join('')||'<div class="empty">No events.</div>';
  $('#latest').innerHTML=S.trades.slice(0,4).map(tradeHTML).join('')||'<div class="empty">No closed trades yet.</div>';

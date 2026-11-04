@@ -273,3 +273,4 @@ body.lwfsopen{overflow:hidden}body.lwfsopen .dock{display:none}
 .wtrack{gap:0;will-change:transform}.wtrack>*{padding-right:28px}
 
 .st.wide{grid-column:1/-1}.st.wide .v{font-size:30px}.st.wide .tp{font-size:16px;font-weight:700;margin-left:8px;opacity:.85}
+.st.fng .gauge{position:absolute;right:8px;top:8px;width:64px;height:36px}.st.fng .needle{transform-origin:50px 50px;transform:rotate(var(--a));animation:fngIn 1.1s cubic-bezier(.2,1.4,.4,1)}@keyframes fngIn{from{transform:rotate(-90deg)}}.st.fng .tp{font-size:14px;font-weight:700;margin-left:4px}
