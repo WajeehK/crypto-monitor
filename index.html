@@ -10,35 +10,42 @@
 <meta name="apple-mobile-web-app-title" content="Crypto Trader">
 <title>Crypto Trader</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" href="icon.svg?v=16" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=16">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=15">
+<link rel="stylesheet" href="app.css?v=16">
 </head><body>
-<div id="spl" aria-hidden="true"><div class="sp-in"><img src="icon.svg" class="sp-logo" alt=""><svg class="sp-line" viewBox="0 0 240 70"><path pathLength="1" d="M0 58 L18 52 L30 56 L46 40 L60 46 L78 30 L92 36 L110 22 L126 28 L144 16 L160 24 L178 12 L196 18 L214 8 L240 4"/><circle class="sp-dot" cx="240" cy="4" r="4"/></svg>
-<div class="sp-t">Crypto Trader</div><div class="sp-pill">PAPER · <b>LIVE</b></div><div class="sp-eq" id="speq"></div></div></div>
-<script>(function(){var s=document.getElementById('spl'),R=matchMedia('(prefers-reduced-motion: reduce)').matches;
+<div id="spl" aria-hidden="true"><div class="sp-in"><div class="sp-stage"><div class="sp-logo mwrap" id="splm"><svg class="mas" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="mgB" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#fff"/><stop offset=".65" stop-color="#dfe3ea"/><stop offset="1" stop-color="#9aa3b2"/></radialGradient></defs><circle cx="50" cy="54" r="40" fill="url(#mgB)" stroke="none"/><g class="m-eyes"><ellipse class="m-e" cx="40" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><ellipse class="m-e" cx="60" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><path class="m-h" d="M34 54 Q40 45 46 54 M54 54 Q60 45 66 54" stroke="#0b0e14" stroke-width="4"/><path class="m-s" d="M34 54 Q40 58 46 54 M54 54 Q60 58 66 54" stroke="#0b0e14" stroke-width="3.5"/><path class="m-w" d="M33 41 L45 44 M67 41 L55 44" stroke="#0b0e14" stroke-width="3"/></g><g class="m-cap"><path d="M14 36 Q30 6 70 14 Q86 18 90 30 Q60 22 14 36Z" fill="#3b82f6" stroke="none"/><circle cx="90" cy="30" r="6" fill="#fff" stroke="none"/><path d="M12 36 Q50 22 86 28" stroke="#e8ecf3" stroke-width="5"/></g></svg></div><div class="sp-shadow"></div></div>
+<svg class="sp-line" viewBox="0 0 120 40"><path pathLength="1" d="M0 34 L14 30 L24 32 L38 22 L50 25 L64 15 L78 18 L92 9 L106 11 L120 3"/><circle class="sp-dot" cx="120" cy="3" r="3"/></svg>
+<div class="sp-t">Crypto Trader</div><div class="sp-eq" id="speq"></div><div class="sp-pill">PAPER · <b>LIVE</b></div></div></div>
+<script>(function(){var s=document.getElementById('spl'),m=document.getElementById('splm'),R=matchMedia('(prefers-reduced-motion: reduce)').matches;
 if(sessionStorage.getItem('ct_spl')){s.remove();return}sessionStorage.setItem('ct_spl',1);document.documentElement.classList.add('spl-on');if(R)s.classList.add('rm');
-var done=0;function end(){if(done)return;done=1;s.classList.add('out');document.body.classList.add('intro');setTimeout(function(){s.remove();document.documentElement.classList.remove('spl-on')},R?200:450);setTimeout(function(){document.body.classList.remove('intro')},1600)}
-s.addEventListener('click',end);setTimeout(end,R?300:1450);
-window.__splEq=function(v){var e=document.getElementById('speq');if(!e||done||R||!(v>0))return;window.__splEq=null;var t0=performance.now();(function f(t){var k=Math.min(1,(t-t0)/600);k=1-Math.pow(1-k,3);e.textContent='$'+(v*k).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});e.classList.add('on');if(k<1)requestAnimationFrame(f)})(t0)}})();</script>
+var done=0,T=[];function at(ms,f){T.push(setTimeout(f,ms))}
+function end(){if(done)return;done=1;T.forEach(clearTimeout);var hd=document.getElementById('mhead');
+ if(!R&&hd&&m){var a=m.getBoundingClientRect(),b=hd.getBoundingClientRect();m.classList.remove('glance','wink','blk');m.style.transform='translate('+(b.left+b.width/2-a.left-a.width/2)+'px,'+(b.top+b.height/2-a.top-a.height/2)+'px) scale('+(b.width/a.width)+')';m.classList.add('fly')}
+ s.classList.add('out');document.body.classList.add('intro');setTimeout(function(){s.remove();document.documentElement.classList.remove('spl-on')},R?200:520);setTimeout(function(){document.body.classList.remove('intro')},1600)}
+s.addEventListener('click',end);
+if(R){at(300,end)}else{at(650,function(){s.classList.add('show2')});at(760,function(){m.classList.add('glance')});at(1150,function(){m.classList.add('blk')});at(1260,function(){m.classList.remove('blk')});at(1420,function(){m.classList.add('wink')});at(1600,function(){m.classList.remove('wink')});at(1640,end)}
+window.__splEq=function(v){var e=document.getElementById('speq');if(!e||done||R||!(v>0))return;window.__splEq=null;var t0=performance.now()+650;(function f(t){var k=Math.max(0,Math.min(1,(t-t0)/650));k=1-Math.pow(1-k,3);e.textContent='$'+(v*k).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});if(k>0)e.classList.add('on');if(k<1)requestAnimationFrame(f)})(performance.now())}})();</script>
 
 <div class="bgfx" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i></div>
 <header class="top">
-  <div class="brand"><img src="icon.svg" alt="" class="bi"><b>Crypto Trader</b><span class="mode">PAPER</span>
+  <div class="brand"><span class="bi mwrap" id="mhead"><svg class="mas" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="mgB" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#fff"/><stop offset=".65" stop-color="#dfe3ea"/><stop offset="1" stop-color="#9aa3b2"/></radialGradient></defs><circle cx="50" cy="54" r="40" fill="url(#mgB)" stroke="none"/><g class="m-eyes"><ellipse class="m-e" cx="40" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><ellipse class="m-e" cx="60" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><path class="m-h" d="M34 54 Q40 45 46 54 M54 54 Q60 45 66 54" stroke="#0b0e14" stroke-width="4"/><path class="m-s" d="M34 54 Q40 58 46 54 M54 54 Q60 58 66 54" stroke="#0b0e14" stroke-width="3.5"/><path class="m-w" d="M33 41 L45 44 M67 41 L55 44" stroke="#0b0e14" stroke-width="3"/></g><g class="m-cap"><path d="M14 36 Q30 6 70 14 Q86 18 90 30 Q60 22 14 36Z" fill="#3b82f6" stroke="none"/><circle cx="90" cy="30" r="6" fill="#fff" stroke="none"/><path d="M12 36 Q50 22 86 28" stroke="#e8ecf3" stroke-width="5"/></g></svg></span><b>Crypto Trader</b><span class="mode">PAPER</span>
     <button class="inst press" id="install" hidden>Install app</button>
     <span class="live" id="live"><i></i>LIVE</span></div>
   <div class="meta" id="meta"></div>
 </header>
 <div class="stale" id="stale" hidden></div>
-<div class="nokey" id="nokey" hidden><div class="nkc"><img src="icon-192.png" alt="" width="72" height="72"><h2>Crypto Trader</h2>
+<div class="nokey" id="nokey" hidden><div class="nkc"><img src="icon-192.png?v=16" alt="" width="72" height="72"><h2>Crypto Trader</h2>
   <p>Enter your password to unlock. This device will be remembered for 7 days.</p>
   <input id="nkin" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="off" spellcheck="false"><button class="pill press" id="nkgo">Unlock</button><p class="mut" id="nkerr"></p></div></div>
 <div class="wire"><div class="wt"><div class="wtrack" id="wire"></div></div></div>
 
 <main class="wrap" id="main">
   <section data-view="home">
+    <div class="hero"><div class="hm mwrap" id="hmas"><svg class="mas" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="mgB" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#fff"/><stop offset=".65" stop-color="#dfe3ea"/><stop offset="1" stop-color="#9aa3b2"/></radialGradient></defs><circle cx="50" cy="54" r="40" fill="url(#mgB)" stroke="none"/><g class="m-eyes"><ellipse class="m-e" cx="40" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><ellipse class="m-e" cx="60" cy="52" rx="4.2" ry="8" fill="#0b0e14" stroke="none"/><path class="m-h" d="M34 54 Q40 45 46 54 M54 54 Q60 45 66 54" stroke="#0b0e14" stroke-width="4"/><path class="m-s" d="M34 54 Q40 58 46 54 M54 54 Q60 58 66 54" stroke="#0b0e14" stroke-width="3.5"/><path class="m-w" d="M33 41 L45 44 M67 41 L55 44" stroke="#0b0e14" stroke-width="3"/></g><g class="m-cap"><path d="M14 36 Q30 6 70 14 Q86 18 90 30 Q60 22 14 36Z" fill="#3b82f6" stroke="none"/><circle cx="90" cy="30" r="6" fill="#fff" stroke="none"/><path d="M12 36 Q50 22 86 28" stroke="#e8ecf3" stroke-width="5"/></g></svg></div><div class="hk">Paper balance</div><div class="hv" id="heq">—</div><div class="hrow"><span class="hpill" id="hpill"></span><span class="mut hsub" id="hsub"></span></div>
+      <div class="chips"><span class="cl"><i></i>LIVE</span><button class="press" data-jump="positions">Positions</button><button class="press" data-goto="trades">Trades</button><button class="press" data-goto="markets">Markets</button><button class="press" data-goto="stats">Stats</button></div></div>
     <div class="stats" id="stats"></div>
     <div class="lbl sec"><span>Open positions</span><span class="cnt" id="npos">0</span></div>
     <div id="positions"></div>
@@ -111,6 +118,6 @@ window.__splEq=function(v){var e=document.getElementById('speq');if(!e||done||R|
   <button class="tb" data-tab="stats"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Stats</span></button>
 </nav>
 <script src="lwc.js"></script>
-<script src="chart.js?v=15"></script>
-<script src="app.js?v=15"></script>
+<script src="chart.js?v=16"></script>
+<script src="app.js?v=16"></script>
 </body></html>

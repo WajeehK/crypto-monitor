@@ -122,10 +122,10 @@ function chart(pts,start){
  $('#axhi').textContent=usd(mx);$('#axlo').textContent=usd(mn);$('#chartmeta').textContent=`${pts.length-1} closes`}
 function ldnMidnight(){const n=new Date(),p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:TZ,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'}).formatToParts(n).map(x=>[x.type,x.value]));
  const wall=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second),off=wall-Math.floor(n/1000)*1000;return Date.UTC(+p.year,+p.month-1,+p.day)-off}
-function todayHTML(a){const m0=ldnMidnight(),tt=x=>Date.parse(String(x||'').replace(/(\.\d{3})\d+/,'$1'));
+let TODAY=null;function todayHTML(a){const m0=ldnMidnight(),tt=x=>Date.parse(String(x||'').replace(/(\.\d{3})\d+/,'$1'));
  const tr=(S.trades||[]).filter(t=>tt(t.time)>=m0),real=tr.reduce((s,t)=>s+(t.pnl||0),0);
  let eq0=a.start;for(const e of S.equity_curve||[]){if(!e.live&&tt(e.t)<m0)eq0=e.eq}
- const eq=a.equity??eq0,d=eq-eq0,u=d-real,pc=eq0?d/eq0*100:0,c=d>=0?'#00ba7c':'#f91880';
+ const eq=a.equity??eq0,d=eq-eq0,u=d-real,pc=eq0?d/eq0*100:0,c=d>=0?'#00ba7c':'#f91880';TODAY={d,pc,n:tr.length};
  return `<div class="st wide" style="--c:${c}"><div class="k">Today's return</div><div class="v ${cls(d)}">${usd(d,1)} <span class="tp">${pct(pc)}</span></div><div class="s">realised ${usd(real,1)} · unrealised ${usd(u,1)} · ${tr.length} trade${tr.length==1?'':'s'} today</div></div>`}
 let FNG=null;try{FNG=JSON.parse(localStorage.getItem('ct-fng')||'null')}catch(e){}
 function fngCol(v){return v<25?'#f91880':v<45?'#ff7a45':v<55?'#ffd400':v<75?'#7ed957':'#00ba7c'}
@@ -139,8 +139,13 @@ function fngHTML(){if(!FNG)return `<div class="st fng" id="fng" style="--c:#7176
 async function loadFng(){if(FNG&&Date.now()-FNG.at<6e5)return;try{const r=await fetch('https://api.alternative.me/fng/?limit=2',{cache:'no-store'}),j=await r.json(),d=j.data;
  FNG={v:+d[0].value,c:d[0].value_classification,p:d[1]?+d[1].value:null,at:Date.now()};localStorage.setItem('ct-fng',JSON.stringify(FNG));const el=$('#fng');if(el)el.outerHTML=fngHTML()}catch(e){}}
 loadFng();setInterval(loadFng,6e5);
+function mood(el,m){if(el)el.className=el.className.replace(/\bm-(happy|worried|sleepy|calm)\b/g,'').trim()+' m-'+m}
+function hero(a,h){const t=TODAY||{d:0,pc:0,n:0},m=h.stale?'sleepy':t.d>0.005?'happy':t.d<-0.005?'worried':'calm';mood($('#hmas'),m);mood($('#mhead'),m);
+ $('#heq').textContent=usd(a.equity);const p=$('#hpill');p.className='hpill '+(t.d>=0?'up':'dn');p.textContent=(t.d>=0?'▲ ':'▼ ')+usd(Math.abs(t.d))+' ('+pct(t.pc)+') today';
+ $('#hsub').textContent=h.stale?'bot is napping · heartbeat stale':`${S.positions.length} open · ${t.n} closed today`}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(b){const el=$('#'+b.dataset.jump);el&&el.scrollIntoView({behavior:RM?'auto':'smooth',block:'start'})}});
 function render(){
- if(!S)return;fixHealth();const a=S.account,h=S.health;if(window.__splEq)__splEq(a.equity);try{X15.on()}catch(e){console.warn(e)}
+ if(!S)return;fixHealth();const a=S.account,h=S.health;if(window.__splEq)__splEq(a.equity);try{X15.on()}catch(e){console.warn(e)}try{hero(a,h)}catch(e){console.warn(e)}
  const age=h.age_s==null?'?':h.age_s<90?Math.round(h.age_s)+'s':Math.round(h.age_s/60)+'m';
  $('#meta').innerHTML=`<span>Heartbeat <b class="${h.stale?'bad':''}">${age} ago${h.stale?' · STALE':''}</b></span><span>Cycle <b>${h.cycle_ms??'—'} ms</b></span><span>Mode <b>${esc(h.mode||'—')}</b></span><span>Errors <b class="${h.errors?'bad':''}">${h.errors??'—'}</b></span><span>PID <b>${h.pid??'—'}</b></span>`;
  $('#stats').innerHTML=[['Equity (est)',usd(a.equity),'started at '+usd(a.start),'#1d9bf0',''],['Total P&L',usd(a.total_pnl,1),pct(a.total_pct),a.total_pnl>=0?'#00ba7c':'#f91880',cls(a.total_pnl)],
@@ -515,7 +520,7 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
 $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
 /* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
 (()=>{if(RM)return;const seen=new WeakSet(),prev=new Map(),busy=new WeakSet();
- const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.pos b,.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
+ const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.hv,.pos b,.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
  const parse=t=>{const m=String(t).match(/([−-])?\$?([\d,]*\.?\d+)/);return m?{v:(m[1]?-1:1)*parseFloat(m[2].replace(/,/g,'')),s:m[0],d:(m[2].split('.')[1]||'').length}:null};
  function countUp(el,n){busy.add(el);const tpl=el.textContent,t0=performance.now(),D=700;
   const step=t=>{const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,3),v=Math.abs(n.v)*e;
@@ -543,7 +548,7 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
   const P=[...Array(110)].map(()=>({x:innerWidth/2,y:innerHeight*.42,vx:(Math.random()-.5)*12,vy:-Math.random()*13-3,r:Math.random()*6.28,s:4+Math.random()*5,c:['#00ba7c','#7dffc4','#ffd400','#1d9bf0','#a78bfa'][Math.random()*5|0]}));const t0=performance.now();
   (function f(t){g.clearRect(0,0,innerWidth,innerHeight);P.forEach(p=>{p.vy+=.35;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=.2;g.save();g.translate(p.x,p.y);g.rotate(p.r);g.fillStyle=p.c;g.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);g.restore()});if(t-t0<1800)requestAnimationFrame(f);else c.remove()})(t0)}
  function closedFx(t){const win=(t.pnl||0)>0,o=document.createElement('div');o.className='tco '+(win?'win':'loss');
-  o.innerHTML=`<div class="tcc"><div class="tck">Trade closed</div><div class="tcn">${ci(t.coin,40)} ${esc(t.coin)} <span class="tside ${t.side==='long'?'up':'dn'}">${esc(String(t.side||'').toUpperCase())}</span></div><div class="tcp ${win?'up':'dn'}">${usd(0,1)}</div><div class="tcx">exit ${px(t.exit)} · ${esc(reasons[t.reason]||human(t.reason))}</div></div>`;
+  o.innerHTML=`<div class="tcc"><div class="tcm mwrap m-${win?'happy cheer':'worried'}">${document.querySelector('#mhead').innerHTML}</div><div class="tck">Trade closed</div><div class="tcn">${ci(t.coin,40)} ${esc(t.coin)} <span class="tside ${t.side==='long'?'up':'dn'}">${esc(String(t.side||'').toUpperCase())}</span></div><div class="tcp ${win?'up':'dn'}">${usd(0,1)}</div><div class="tcx">exit ${px(t.exit)} · ${esc(reasons[t.reason]||human(t.reason))}</div></div>`;
   document.body.appendChild(o);(win?SFX.win:SFX.loss)();if(win)confetti();const pe=o.querySelector('.tcp'),t0=performance.now(),D=RM?1:900;
   (function f(n){const k=Math.min(1,(n-t0)/D),e=1-Math.pow(1-k,3);pe.textContent=usd((t.pnl||0)*e,1);if(k<1)requestAnimationFrame(f)})(t0);
   let gone=0;const fly=()=>{if(gone)return;gone=1;const tb=tbs[TABS.indexOf('trades')],cr=o.querySelector('.tcc').getBoundingClientRect(),br=tb.getBoundingClientRect();
