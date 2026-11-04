@@ -267,3 +267,7 @@ body.lwfsopen{overflow:hidden}body.lwfsopen .dock{display:none}
 .sellsh .sh-card{animation:fxin .35s cubic-bezier(.2,.9,.25,1)}
 .live i{animation:pl 1.6s infinite}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* v11 ticker: no label, full-width seamless loop (per-item spacing so -50% lands exactly on the copy) */
+.wl{display:none}.wt{-webkit-mask-image:none;mask-image:none}
+.wtrack{gap:0;will-change:transform}.wtrack>*{padding-right:28px}
