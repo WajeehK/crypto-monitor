@@ -140,7 +140,7 @@ async function loadFng(){if(FNG&&Date.now()-FNG.at<6e5)return;try{const r=await 
  FNG={v:+d[0].value,c:d[0].value_classification,p:d[1]?+d[1].value:null,at:Date.now()};localStorage.setItem('ct-fng',JSON.stringify(FNG));const el=$('#fng');if(el)el.outerHTML=fngHTML()}catch(e){}}
 loadFng();setInterval(loadFng,6e5);
 function render(){
- if(!S)return;fixHealth();const a=S.account,h=S.health;if(window.__splEq)__splEq(a.equity);
+ if(!S)return;fixHealth();const a=S.account,h=S.health;if(window.__splEq)__splEq(a.equity);try{X15.on()}catch(e){console.warn(e)}
  const age=h.age_s==null?'?':h.age_s<90?Math.round(h.age_s)+'s':Math.round(h.age_s/60)+'m';
  $('#meta').innerHTML=`<span>Heartbeat <b class="${h.stale?'bad':''}">${age} ago${h.stale?' · STALE':''}</b></span><span>Cycle <b>${h.cycle_ms??'—'} ms</b></span><span>Mode <b>${esc(h.mode||'—')}</b></span><span>Errors <b class="${h.errors?'bad':''}">${h.errors??'—'}</b></span><span>PID <b>${h.pid??'—'}</b></span>`;
  $('#stats').innerHTML=[['Equity (est)',usd(a.equity),'started at '+usd(a.start),'#1d9bf0',''],['Total P&L',usd(a.total_pnl,1),pct(a.total_pct),a.total_pnl>=0?'#00ba7c':'#f91880',cls(a.total_pnl)],
@@ -486,7 +486,7 @@ async function alCheck(){const act=ALR.filter(a=>!a.hit);if(!act.length)return;
   try{const j=await (await fetch('https://api.kraken.com/0/public/Ticker?pair='+spotPair(a0.sym))).json();const k=j.result&&Object.keys(j.result)[0];if(k)p=+j.result[k].c[0]}catch(_){}
   if(!(p>0)){const m=MK&&MK.coins.find(x=>x[0]===cid);if(m)p=m[4]}
   if(!(p>0))continue;alPrice[cid]=p;
-  for(const a of act.filter(a=>a.cid===cid))if(a.dir==='above'?p>=a.price:p<=a.price){a.hit=Date.now();
+  for(const a of act.filter(a=>a.cid===cid))if(a.dir==='above'?p>=a.price:p<=a.price){a.hit=Date.now();try{window.__x15&&__x15.SFX.alert()}catch(_){}
    const msg=`${a.sym} ${a.dir==='above'?'rose above':'fell below'} ${mpx(a.price)} — now ${mpx(p)}`;toast('🔔 '+msg);
    try{if(Notification.permission==='granted')(await navigator.serviceWorker.ready).showNotification('Price alert: '+a.sym,{body:msg,tag:'alert-'+a.id,icon:'icon-192.png',badge:'badge-96.png'})}catch(_){}}}
  alSave();if(V&&V.redrawAl)V.redrawAl()}
@@ -515,7 +515,7 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
 $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
 /* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
 (()=>{if(RM)return;const seen=new WeakSet(),prev=new Map(),busy=new WeakSet();
- const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
+ const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.pos b,.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
  const parse=t=>{const m=String(t).match(/([−-])?\$?([\d,]*\.?\d+)/);return m?{v:(m[1]?-1:1)*parseFloat(m[2].replace(/,/g,'')),s:m[0],d:(m[2].split('.')[1]||'').length}:null};
  function countUp(el,n){busy.add(el);const tpl=el.textContent,t0=performance.now(),D=700;
   const step=t=>{const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,3),v=Math.abs(n.v)*e;
@@ -531,6 +531,63 @@ $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sel
  let q=0;new MutationObserver(()=>{if(!q)q=requestAnimationFrame(()=>{q=0;scan()})}).observe(document.body,{subtree:true,childList:true,characterData:true});
  document.addEventListener('click',e=>{if(e.target.closest('.tb,[data-goto]'))setTimeout(()=>{document.querySelectorAll('[data-view]:not([hidden]) *').forEach(x=>seen.delete(x));scan()},20)});
  view.addEventListener('transitionstart',()=>seen.delete(vbody));new MutationObserver(()=>{if(view.hidden)seen.delete(vbody)}).observe(view,{attributes:true,attributeFilter:['hidden']})})();
+/* ---------- v15: trade-closed overlay, bot terminal, stats curve, sound/haptics, streaks/badges, recap ---------- */
+const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(_){return d}},SV=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+ let snd=LS('ct_sound',true),AC=null,lastPos=null,termSeen=null,x15html='',ath=null;
+ const unlock=()=>{if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(_){}}if(AC&&AC.state==='suspended')AC.resume()};
+ addEventListener('pointerdown',unlock,{passive:true});
+ function tone(seq){if(!snd||!AC)return;let t=AC.currentTime;seq.forEach(([f,d,ty])=>{const o=AC.createOscillator(),g=AC.createGain();o.type=ty||'sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.15,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02);t+=d*.8})}
+ const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(_){}};
+ const SFX={open:()=>{tone([[660,.09],[880,.12]]);buzz(30)},win:()=>{tone([[523,.1],[659,.1],[784,.1],[1047,.25,'triangle']]);buzz([40,40,80])},loss:()=>{tone([[330,.15,'sawtooth'],[220,.3,'sawtooth']]);buzz([120])},alert:()=>{tone([[988,.08],[988,.08],[1319,.18]]);buzz([50,50,50])}};
+ function confetti(){if(RM)return;const c=document.createElement('canvas');c.className='confetti';const d=devicePixelRatio||1;c.width=innerWidth*d;c.height=innerHeight*d;document.body.appendChild(c);const g=c.getContext('2d');g.scale(d,d);
+  const P=[...Array(110)].map(()=>({x:innerWidth/2,y:innerHeight*.42,vx:(Math.random()-.5)*12,vy:-Math.random()*13-3,r:Math.random()*6.28,s:4+Math.random()*5,c:['#00ba7c','#7dffc4','#ffd400','#1d9bf0','#a78bfa'][Math.random()*5|0]}));const t0=performance.now();
+  (function f(t){g.clearRect(0,0,innerWidth,innerHeight);P.forEach(p=>{p.vy+=.35;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=.2;g.save();g.translate(p.x,p.y);g.rotate(p.r);g.fillStyle=p.c;g.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);g.restore()});if(t-t0<1800)requestAnimationFrame(f);else c.remove()})(t0)}
+ function closedFx(t){const win=(t.pnl||0)>0,o=document.createElement('div');o.className='tco '+(win?'win':'loss');
+  o.innerHTML=`<div class="tcc"><div class="tck">Trade closed</div><div class="tcn">${ci(t.coin,40)} ${esc(t.coin)} <span class="tside ${t.side==='long'?'up':'dn'}">${esc(String(t.side||'').toUpperCase())}</span></div><div class="tcp ${win?'up':'dn'}">${usd(0,1)}</div><div class="tcx">exit ${px(t.exit)} · ${esc(reasons[t.reason]||human(t.reason))}</div></div>`;
+  document.body.appendChild(o);(win?SFX.win:SFX.loss)();if(win)confetti();const pe=o.querySelector('.tcp'),t0=performance.now(),D=RM?1:900;
+  (function f(n){const k=Math.min(1,(n-t0)/D),e=1-Math.pow(1-k,3);pe.textContent=usd((t.pnl||0)*e,1);if(k<1)requestAnimationFrame(f)})(t0);
+  let gone=0;const fly=()=>{if(gone)return;gone=1;const tb=tbs[TABS.indexOf('trades')],cr=o.querySelector('.tcc').getBoundingClientRect(),br=tb.getBoundingClientRect();
+   o.querySelector('.tcc').style.transform=`translate(${br.left+br.width/2-(cr.left+cr.width/2)}px,${br.top+br.height/2-(cr.top+cr.height/2)}px) scale(.08)`;o.classList.add('fly');setTimeout(()=>{o.remove();tb.classList.add('tbping');setTimeout(()=>tb.classList.remove('tbping'),700)},RM?50:650)};
+  o.addEventListener('click',fly);setTimeout(fly,RM?1500:2800)}
+ function detect(){const ids=S.trades.map(t=>t.id);let seen=LS('ct_seen',null);
+  if(!seen){SV('ct_seen',ids.slice(0,200));}else{const nw=S.trades.filter(t=>!seen.includes(t.id)&&Date.now()-pd(t.time)<6*3600e3);nw.slice(0,3).reverse().forEach((t,i)=>setTimeout(()=>closedFx(t),i*3200));if(S.trades.some(t=>!seen.includes(t.id)))SV('ct_seen',[...new Set([...ids,...seen])].slice(0,200))}
+  const ps=S.positions.map(p=>p.symbol+p.opened).join();if(lastPos!=null){const old=lastPos.split(',');if(S.positions.some(p=>!old.includes(p.symbol+p.opened)))SFX.open()}lastPos=ps}
+ function term(){const T=$('#term');if(!T)return;if(T.offsetParent&&!T.dataset.s){T.dataset.s=1;requestAnimationFrame(()=>T.scrollTop=T.scrollHeight)}let el=T.firstElementChild;if(!el){el=document.createElement('div');T.appendChild(el)}const L=S.activity.slice(0,50).slice().reverse(),key=x=>x.time+x.text;
+  const line=x=>{const d=pd(x.time),tm=ok(d)?d.toLocaleTimeString('en-GB',{timeZone:TZ}):'';return `<div class="tl ${x.tone||''}"><span class="tt">${tm}</span> <span class="tkk">${esc(KN[x.kind]||x.kind||'')}</span> <span class="tx">${esc(x.text)}</span></div>`};
+  if(!termSeen){el.innerHTML=L.map(line).join('')+'<div class="tl cur">▍</div>';termSeen=new Set(L.map(key));T.scrollTop=T.scrollHeight;return}
+  L.filter(x=>!termSeen.has(key(x))).forEach(x=>{termSeen.add(key(x));const w=document.createElement('div');w.innerHTML=line(x);const n=w.firstChild,tx=n.querySelector('.tx'),full=tx.textContent;el.insertBefore(n,el.lastChild);
+   if(!RM){tx.textContent='';let i=0;const iv=setInterval(()=>{tx.textContent=full.slice(0,i+=2);if(i>=full.length)clearInterval(iv)},18)}while(el.children.length>51)el.firstChild.remove();T.scrollTop=T.scrollHeight})}
+ function streaks(){const tr=S.trades.slice().reverse();let cur=0,best=0,c=0;tr.forEach(t=>{if((t.pnl||0)>0){c++;best=Math.max(best,c)}else c=0});for(const t of S.trades){if((t.pnl||0)>0)cur++;else break}
+  const days={};tr.forEach(t=>{const d=pd(t.time);if(ok(d)){const k=d.toLocaleDateString('en-GB',{timeZone:TZ});days[k]=(days[k]||0)+(t.pnl||0)}});return {cur,best,bestDay:Math.max(0,...Object.values(days))}}
+ function eqSvg(){const a=S.account,pts=S.equity_curve.map(e=>({t:pd(e.t),v:e.eq})).filter(p=>ok(p.t));pts.push({t:new Date(),v:a.equity});if(pts.length<2)return '';
+  const W=600,H=200,vs=pts.map(p=>p.v),mn=Math.min(...vs),mx=Math.max(...vs),rg=mx-mn||1,X=i=>i/(pts.length-1)*W,Y=v=>12+(1-(v-mn)/rg)*(H-24);
+  const d=pts.map((p,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' '),lx=X(pts.length-1),ly=Y(a.equity),hi=a.equity>=mx-1e-9,col=a.equity>=a.start?'#00ba7c':'#f91880';
+  return `<svg class="eqc" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".3"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${W} ${H} L0 ${H}Z" fill="url(#eg)" class="eqf"/><path d="${d}" pathLength="1" class="eql" stroke="${col}"/></svg><div class="eqdot ${hi?'ath':''}" style="left:calc(${lx/W*100}% - 6px);top:calc(${ly/H*100}% - 6px);--c:${col}"></div>`}
+ function badges(st){const tr=S.trades,a=S.account;return [['🥇','First win',tr.some(t=>t.pnl>0)],['🔥','3-win streak',st.best>=3],['📅','+$10 day',st.bestDay>=10],['💰','+$50 total',a.total_pnl>=50],['🔟','10 trades',tr.length>=10],['🚀','5-win streak',st.best>=5]]}
+ function stats(){const el=$('#x15');if(!el)return;const st=streaks(),bs=badges(st),got=LS('ct_badges',[]);const fresh=bs.filter(b=>b[2]&&!got.includes(b[1])).map(b=>b[1]);
+  const html=`<div class="panel" style="margin-top:14px"><div class="lbl"><span>Equity curve</span><span class="mut">since 29 Oct</span></div><div class="eqw">${eqSvg()}</div></div>
+  <div class="panel" style="margin-top:14px"><div class="lbl"><span>Streaks</span></div><div class="stk"><div><span>Current win streak</span><b class="${st.cur?'up':''}">${st.cur}${st.cur>=2?' 🔥':''}</b></div><div><span>Best win streak</span><b>${st.best}</b></div></div>
+  <div class="lbl" style="margin-top:12px"><span>Badges</span><span class="mut">${bs.filter(b=>b[2]).length}/${bs.length}</span></div><div class="bdg">${bs.map(b=>`<div class="bd ${b[2]?'on':''} ${fresh.includes(b[1])?'new':''}"><i>${b[0]}</i><span>${b[1]}</span></div>`).join('')}</div></div>
+  <div class="panel" style="margin-top:14px"><div class="kv sw"><span>Sound &amp; haptics<small>Trade open/close and price alerts${/iphone|ipad/i.test(navigator.userAgent)?' · vibration not supported on iOS':''}</small></span><button class="tgl press ${snd?'on':''}" id="sndT" role="switch" aria-checked="${snd}"><i></i></button></div>
+  <div class="npbtns"><button class="pill press" id="recapB">Share daily recap</button></div></div>`;
+  const key=html.replace(/left:calc[^"]*|top:calc[^"]*/g,'');if(key===x15html)return;const first=!x15html;x15html=key;el.innerHTML=html;
+  if(fresh.length)SV('ct_badges',[...got,...fresh]);$('#sndT').onclick=()=>{snd=!snd;SV('ct_sound',snd);$('#sndT').setAttribute('aria-checked',snd);$('#sndT').classList.toggle('on',snd);unlock();if(snd)SFX.open()};$('#recapB').onclick=recap;
+  if(!first)el.querySelector('.eqw').classList.add('nodraw')}
+ function recap(){const a=S.account,m0=ldnMidnight(),tr=S.trades.filter(t=>pd(t.time)>=m0),w=tr.filter(t=>t.pnl>0).length,real=tr.reduce((s,t)=>s+(t.pnl||0),0),best=tr.reduce((b,t)=>!b||t.pnl>b.pnl?t:b,null);
+  let eq0=a.start;for(const e of S.equity_curve)if(!e.live&&pd(e.t)<m0)eq0=e.eq;const d=a.equity-eq0;
+  const c=document.createElement('canvas');c.width=1080;c.height=1080;const g=c.getContext('2d'),col=d>=0?'#00ba7c':'#f91880';
+  const bg=g.createRadialGradient(540,380,50,540,540,800);bg.addColorStop(0,'#0b2219');bg.addColorStop(1,'#000');g.fillStyle=bg;g.fillRect(0,0,1080,1080);
+  g.strokeStyle=col;g.globalAlpha=.6;g.lineWidth=4;g.strokeRect(40,40,1000,1000);g.globalAlpha=1;g.textAlign='center';g.fillStyle='#71767b';g.font='600 34px ui-monospace,monospace';
+  g.fillText('CRYPTO TRADER · DAILY RECAP',540,140);g.fillText(new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:TZ}),540,195);
+  g.shadowColor=col;g.shadowBlur=40;g.fillStyle=col;g.font='800 150px system-ui,sans-serif';g.fillText(usd(d,1),540,400);g.shadowBlur=0;g.font='700 52px system-ui,sans-serif';g.fillText(pct(eq0?d/eq0*100:0)+' today',540,480);
+  const rows=[['Trades today',String(tr.length)],['Win rate today',tr.length?Math.round(w/tr.length*100)+'%':'—'],['Realised',usd(real,1)],['Best trade',best?`${best.coin} ${usd(best.pnl,1)}`:'—'],['Equity',usd(a.equity)]];
+  g.font='500 44px system-ui,sans-serif';rows.forEach(([k,v],i)=>{const y=600+i*80;g.textAlign='left';g.fillStyle='#8b98a5';g.fillText(k,140,y);g.textAlign='right';g.fillStyle='#e7e9ea';g.fillText(v,940,y)});
+  g.textAlign='center';g.fillStyle='#3a3f44';g.font='500 28px ui-monospace,monospace';g.fillText('paper account · Kraken Futures',540,1010);
+  c.toBlob(async b=>{const f=new File([b],'crypto-trader-recap.png',{type:'image/png'});window.__recap=c.toDataURL('image/png');
+   try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Crypto Trader daily recap'});return}}catch(e){if(e.name==='AbortError')return}
+   const u=URL.createObjectURL(b),l=document.createElement('a');l.href=u;l.download=f.name;l.click();setTimeout(()=>URL.revokeObjectURL(u),2000)},'image/png')}
+ return {on(){if(!S)return;detect();term();stats()},closedFx,SFX,recap}})();
+window.__x15=X15;document.addEventListener('click',e=>{if(e.target.closest('.tb,[data-goto]'))setTimeout(()=>{const T=$('#term');if(T&&T.offsetParent)T.scrollTop=T.scrollHeight},60)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
 window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook

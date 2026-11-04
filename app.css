@@ -291,3 +291,25 @@ body.lwfsopen{overflow:hidden}body.lwfsopen .dock{display:none}
 body.intro .st,body.intro .pos{animation:cardIn .5s cubic-bezier(.2,.9,.3,1) both}
 body.intro .st:nth-child(2){animation-delay:.06s}body.intro .st:nth-child(3){animation-delay:.12s}body.intro .st:nth-child(4){animation-delay:.18s}body.intro .st:nth-child(5){animation-delay:.24s}body.intro .pos{animation-delay:.3s}
 @keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.98)}}
+
+/* v15 */
+.tco{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);animation:tcoIn .25s both}
+.tco.fly{background:transparent;transition:background .5s}.tcc{background:var(--panel);border:1px solid var(--bd);border-radius:22px;padding:22px 28px;min-width:260px;text-align:center;transition:transform .6s cubic-bezier(.6,0,.4,1),opacity .6s;animation:tccIn .45s cubic-bezier(.2,1.4,.4,1) both}
+.tco.fly .tcc{opacity:.2}.tco.win .tcc{box-shadow:0 0 0 1px #00ba7c,0 0 40px rgba(0,186,124,.45)}.tco.loss .tcc{box-shadow:0 0 0 1px #f91880,0 0 30px rgba(249,24,128,.3);animation:tccIn .45s both,shake .45s .3s}
+.tck{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--mu);text-transform:uppercase}.tcn{display:flex;align-items:center;justify-content:center;gap:8px;font-size:22px;font-weight:800;margin-top:8px}
+.tside{font-size:11px;font-family:var(--mono);border:1px solid currentColor;border-radius:6px;padding:1px 6px}.tcp{font-size:44px;font-weight:800;margin:6px 0 2px;letter-spacing:-.02em}.tcx{color:var(--mu);font-size:13.5px}
+@keyframes tcoIn{from{opacity:0}}@keyframes tccIn{from{transform:scale(.6);opacity:0}}@keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+.confetti{position:fixed;inset:0;width:100%;height:100%;z-index:9001;pointer-events:none}
+.tbping{animation:tbp .7s}@keyframes tbp{30%{transform:scale(1.25)}}
+.term{background:#030806;border:1px solid #12301f;border-radius:14px;padding:10px 12px;height:280px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;line-height:1.55;color:#9fe8c4;box-shadow:inset 0 0 30px rgba(0,186,124,.07);margin-bottom:14px}
+.tl{white-space:pre-wrap;word-break:break-word;animation:tcoIn .3s}.tl .tt{color:#3f6b55}.tl .tkk{color:#7dffc4;font-weight:700}.tl.dn .tkk,.tl.dn .tx{color:#ff6b9d}.tl.up .tkk{color:#00ba7c}.tl.cur{color:#00ba7c;animation:blink 1s steps(2) infinite}@keyframes blink{50%{opacity:0}}
+.eqw{position:relative;height:170px}.eqc{width:100%;height:100%;overflow:visible}.eql{fill:none;stroke-width:2.5;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 6px currentColor);stroke-dasharray:1;stroke-dashoffset:1;animation:spDraw 1.4s .1s cubic-bezier(.4,0,.2,1) forwards}
+.eqf{opacity:0}.eqw.nodraw .eql{animation:none;stroke-dashoffset:0}.eqw.nodraw .eqf{animation:none;opacity:1}
+.eqf{animation:eqf .8s .9s forwards}@keyframes eqf{to{opacity:1}}
+.eqdot{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c);animation:pdot 1.6s infinite}.eqdot.ath::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #ffd400;animation:ring 1.6s infinite}
+@keyframes pdot{50%{transform:scale(1.3)}}@keyframes ring{from{transform:scale(1);opacity:1}to{transform:scale(3.2);opacity:0}}
+.stk{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stk div{background:#0a0d0f;border:1px solid var(--bd);border-radius:12px;padding:10px 12px}.stk span{display:block;font-size:12px;color:var(--mu)}.stk b{font-size:24px}
+.bdg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.bd{position:relative;overflow:hidden;text-align:center;border:1px solid var(--bd);border-radius:12px;padding:10px 4px;opacity:.38;filter:grayscale(1)}.bd i{font-style:normal;font-size:24px;display:block}.bd span{font-size:11.5px;color:var(--mu)}
+.bd.on{opacity:1;filter:none;border-color:#2b5a45;background:linear-gradient(160deg,#0d1f17,#050807)}.bd.on::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);transform:translateX(-100%)}
+.bd.new::after{animation:shim 1.2s 2}.bd.on:active::after{animation:shim .9s}@keyframes shim{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){.tco,.tcc,.tl,.eql,.eqf,.eqdot,.eqdot::after,.bd::after{animation:none!important}.eql{stroke-dashoffset:0}.eqf{opacity:1}}
