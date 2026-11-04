@@ -271,3 +271,5 @@ body.lwfsopen{overflow:hidden}body.lwfsopen .dock{display:none}
 /* v11 ticker: no label, full-width seamless loop (per-item spacing so -50% lands exactly on the copy) */
 .wl{display:none}.wt{-webkit-mask-image:none;mask-image:none}
 .wtrack{gap:0;will-change:transform}.wtrack>*{padding-right:28px}
+
+.st.wide{grid-column:1/-1}.st.wide .v{font-size:30px}.st.wide .tp{font-size:16px;font-weight:700;margin-left:8px;opacity:.85}

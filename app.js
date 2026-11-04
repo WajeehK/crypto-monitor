@@ -120,13 +120,20 @@ function chart(pts,start){
  const tag=$('#ctag');tag.style.left='calc(100% - 4px)';tag.style.top=(Y(last)/H*100)+'%';tag.style.color=col;
  tag.innerHTML=`${usd(last)} <span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid ${col};background:#000;box-shadow:0 0 14px ${col};position:absolute;right:-1px;top:50%;transform:translate(50%,-50%)"></span>`;
  $('#axhi').textContent=usd(mx);$('#axlo').textContent=usd(mn);$('#chartmeta').textContent=`${pts.length-1} closes`}
+function ldnMidnight(){const n=new Date(),p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:TZ,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'}).formatToParts(n).map(x=>[x.type,x.value]));
+ const wall=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second),off=wall-Math.floor(n/1000)*1000;return Date.UTC(+p.year,+p.month-1,+p.day)-off}
+function todayHTML(a){const m0=ldnMidnight(),tt=x=>Date.parse(String(x||'').replace(/(\.\d{3})\d+/,'$1'));
+ const tr=(S.trades||[]).filter(t=>tt(t.time)>=m0),real=tr.reduce((s,t)=>s+(t.pnl||0),0);
+ let eq0=a.start;for(const e of S.equity_curve||[]){if(!e.live&&tt(e.t)<m0)eq0=e.eq}
+ const eq=a.equity??eq0,d=eq-eq0,u=d-real,pc=eq0?d/eq0*100:0,c=d>=0?'#00ba7c':'#f91880';
+ return `<div class="st wide" style="--c:${c}"><div class="k">Today's return</div><div class="v ${cls(d)}">${usd(d,1)} <span class="tp">${pct(pc)}</span></div><div class="s">realised ${usd(real,1)} · unrealised ${usd(u,1)} · ${tr.length} trade${tr.length==1?'':'s'} today</div></div>`}
 function render(){
  if(!S)return;fixHealth();const a=S.account,h=S.health;
  const age=h.age_s==null?'?':h.age_s<90?Math.round(h.age_s)+'s':Math.round(h.age_s/60)+'m';
  $('#meta').innerHTML=`<span>Heartbeat <b class="${h.stale?'bad':''}">${age} ago${h.stale?' · STALE':''}</b></span><span>Cycle <b>${h.cycle_ms??'—'} ms</b></span><span>Mode <b>${esc(h.mode||'—')}</b></span><span>Errors <b class="${h.errors?'bad':''}">${h.errors??'—'}</b></span><span>PID <b>${h.pid??'—'}</b></span>`;
  $('#stats').innerHTML=[['Equity (est)',usd(a.equity),'started at '+usd(a.start),'#1d9bf0',''],['Total P&L',usd(a.total_pnl,1),pct(a.total_pct),a.total_pnl>=0?'#00ba7c':'#f91880',cls(a.total_pnl)],
   ['Win rate',a.win_rate==null?'—':a.win_rate.toFixed(1)+'%',`${a.wins} wins · ${a.trades-a.wins} losses`,'#a78bfa',''],['Unrealised',usd(a.upnl,1),`realised ${usd(a.realised,1)}`,a.upnl>=0?'#00ba7c':'#f91880',cls(a.upnl)]]
-  .map(([k,v,s,c,cl])=>`<div class="st" style="--c:${c}"><div class="k">${k}</div><div class="v ${cl}">${v}</div><div class="s">${s}</div></div>`).join('');
+  .map(([k,v,s,c,cl])=>`<div class="st" style="--c:${c}"><div class="k">${k}</div><div class="v ${cl}">${v}</div><div class="s">${s}</div></div>`).join('')+todayHTML(a);
  $('#npos').textContent=S.positions.length;loadPosData();renderPositions();chart(S.equity_curve,a.start);
  $('#minilog').innerHTML=S.activity.slice(0,8).map(logHTML).join('')||'<div class="empty">No events.</div>';
  $('#latest').innerHTML=S.trades.slice(0,4).map(tradeHTML).join('')||'<div class="empty">No closed trades yet.</div>';
