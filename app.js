@@ -164,8 +164,8 @@ function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textCon
    const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
    const kek=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64u(w.salt),iterations:w.iter},base,{name:'AES-GCM',length:256},false,['decrypt']);
    const raw=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64u(w.iv),additionalData:new TextEncoder().encode('ctmon-keywrap')},kek,b64u(w.ct)));
-   localStorage.setItem('ct_k',btoa(String.fromCharCode(...raw)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''));localStorage.setItem('ct_kexp',Date.now()+WEEK);location.reload()}
-  catch(e){inp.value='';$('#nkerr').textContent=e&&e.name==='OperationError'?'Wrong password':"Couldn't check the password — are you online?";btn.textContent='Wait…';
+   localStorage.setItem('ct_k',btoa(String.fromCharCode(...raw)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''));localStorage.setItem('ct_kexp',Date.now()+WEEK);$('.nkc').classList.add('ok');setTimeout(()=>location.reload(),RM?0:650)}
+  catch(e){inp.value='';inp.classList.remove('shake');void inp.offsetWidth;inp.classList.add('shake');$('#nkerr').textContent=e&&e.name==='OperationError'?'Wrong password':"Couldn't check the password — are you online?";btn.textContent='Wait…';
    setTimeout(()=>{btn.disabled=false;btn.textContent='Unlock';inp.focus()},2000)}};
  btn.onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()}}
 async function tick(){if(!KEY||(document.hidden&&BLOB))return;const now=Date.now()/1000,slot=Math.floor((now-15)/60);
@@ -494,6 +494,24 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
   catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
 (()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
 $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
+/* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
+(()=>{if(RM)return;const seen=new WeakSet(),prev=new WeakMap(),busy=new WeakSet();
+ const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
+ const parse=t=>{const m=String(t).match(/([−-])?\$?([\d,]*\.?\d+)/);return m?{v:(m[1]?-1:1)*parseFloat(m[2].replace(/,/g,'')),s:m[0],d:(m[2].split('.')[1]||'').length}:null};
+ function countUp(el,n){busy.add(el);const tpl=el.textContent,t0=performance.now(),D=700;
+  const step=t=>{const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,3),v=Math.abs(n.v)*e;
+   el.textContent=tpl.replace(n.s,n.s.replace(/[\d,]*\.?\d+/,v.toLocaleString('en-GB',{minimumFractionDigits:n.d,maximumFractionDigits:n.d})));
+   if(k<1)requestAnimationFrame(step);else{el.textContent=tpl;busy.delete(el)}};requestAnimationFrame(step)}
+ function scan(){document.querySelectorAll(NUMS).forEach(el=>{if(busy.has(el))return;const n=parse(el.textContent);if(!n)return;const p=prev.get(el);prev.set(el,n.v);
+   if(p===undefined){if(el.matches('.st .v')&&n.v)countUp(el,n);return}
+   if(n.v!==p){el.classList.remove('fxup','fxdn');void el.offsetWidth;el.classList.add(n.v>p?'fxup':'fxdn')}});
+  document.querySelectorAll('[data-view]:not([hidden]) :is(#positions,#stats,#feed,#latest,#minilog,#act,#mklist,#mkglob,#statsMain), #vbody').forEach(c=>{
+   if(seen.has(c)||!c.children.length||c.querySelector('.empty:only-child'))return;seen.add(c);let i=0;
+   c.querySelectorAll(ROWS).forEach(r=>{if(i<14){r.style.setProperty('--i',i++);r.classList.add('fxin');r.addEventListener('animationend',()=>r.classList.remove('fxin'),{once:true})}})});
+  const ch=$('#chart path');if(ch&&!seen.has(ch)&&ch.getTotalLength){seen.add(ch);const L=ch.getTotalLength();ch.style.strokeDasharray=L;ch.style.strokeDashoffset=L;ch.getBoundingClientRect();ch.style.transition='stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1)';ch.style.strokeDashoffset=0;setTimeout(()=>{ch.style.strokeDasharray='';ch.style.transition=''},1500)}}
+ let q=0;new MutationObserver(()=>{if(!q)q=requestAnimationFrame(()=>{q=0;scan()})}).observe(document.body,{subtree:true,childList:true,characterData:true});
+ document.addEventListener('click',e=>{if(e.target.closest('.tb,[data-goto]'))setTimeout(()=>{document.querySelectorAll('[data-view]:not([hidden]) *').forEach(x=>seen.delete(x));scan()},20)});
+ view.addEventListener('transitionstart',()=>seen.delete(vbody));new MutationObserver(()=>{if(view.hidden)seen.delete(vbody)}).observe(view,{attributes:true,attributeFilter:['hidden']})})();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
 window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook

@@ -243,3 +243,27 @@ body.lwfsopen{overflow:hidden}body.lwfsopen .dock{display:none}
 
 #nkerr:not(:empty){color:var(--dn);font-weight:600}
 .nkc .pill{width:100%}
+
+/* v11 motion */
+@keyframes fxin{from{opacity:0;transform:translate3d(0,14px,0) scale(.985)}to{opacity:1;transform:none}}
+.fxin{animation:fxin .5s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--i,0)*45ms)}
+@keyframes fxup{0%{background:rgba(0,186,124,.32);color:#5dffb8}100%{background:transparent}}
+@keyframes fxdn{0%{background:rgba(249,24,128,.32);color:#ff8cc2}100%{background:transparent}}
+.fxup{animation:fxup .9s ease-out;border-radius:5px}.fxdn{animation:fxdn .9s ease-out;border-radius:5px}
+@keyframes shim{from{background-position:-200% 0}to{background-position:200% 0}}
+#positions:empty,#stats:empty,#latest:empty,#minilog:empty,#feed:empty,#mklist:empty,#statsMain:empty{min-height:120px;border-radius:14px;
+ background:linear-gradient(90deg,#0a0c0e 25%,#16191d 50%,#0a0c0e 75%);background-size:200% 100%;animation:shim 1.4s linear infinite}
+#stats:empty{min-height:170px}
+.press:active{transform:scale(.94);transition-duration:.08s}
+.tb:active svg{transform:scale(.88)}.tb svg{transition:transform .35s var(--spring)}
+@keyframes glow{0%,100%{box-shadow:0 0 0 rgba(29,155,240,0),0 0 24px rgba(0,186,124,.25)}50%{box-shadow:0 0 30px rgba(29,155,240,.45),0 0 60px rgba(0,186,124,.35)}}
+.nkc img{animation:glow 3s ease-in-out infinite}.nkc{animation:fxin .7s cubic-bezier(.2,.9,.25,1) both}
+.nkc.ok img{animation:none;transition:transform .55s var(--spring),box-shadow .5s;transform:scale(1.18) rotate(-8deg);box-shadow:0 0 60px rgba(0,186,124,.8)}
+.nkc.ok #nkgo{background:var(--up);color:#000}.nkc.ok #nkgo::after{content:" ✓"}
+@keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}.shake{animation:shake .4s}
+@keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:none;opacity:1}}
+.sellst b{display:inline-block;animation:pop .5s var(--spring)}
+.sh-card:has(.sellst b.up){box-shadow:0 0 0 1px var(--up),0 0 40px rgba(0,186,124,.45);transition:box-shadow .5s}
+.sellsh .sh-card{animation:fxin .35s cubic-bezier(.2,.9,.25,1)}
+.live i{animation:pl 1.6s infinite}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
