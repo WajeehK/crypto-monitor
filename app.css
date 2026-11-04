@@ -362,3 +362,16 @@ html,body{background:linear-gradient(180deg,#05070d 0%,#081026 55%,#0a1430 100%)
 #spl .sp-line{width:120px;height:40px;opacity:0;margin-top:4px}#spl .sp-line path{animation:none}#spl.show2 .sp-line{opacity:1;transition:opacity .2s}#spl.show2 .sp-line path{animation:spDraw .6s ease-out forwards}#spl .sp-dot{animation:none;opacity:0}#spl.show2 .sp-dot{animation:spDot .7s .5s ease-out forwards}
 #spl .sp-t{animation:spUp .45s .35s both}#spl .sp-pill{animation:spUp .45s .55s both}
 html.spl-on #mhead{opacity:0}#mhead{transition:opacity .15s}
+/* ===== v17: fully black ===== */
+:root{--bg:#000;--panel:#0b0b0c;--bd:#1f1f22;--bd2:#161618;--mu:#9a9a9f}
+html,body{background:#000!important}
+.bgfx{display:none}
+.top{background:rgba(0,0,0,.85)}
+.wire,.wt{background:#000}
+.panel,.st{background:#0b0b0c;border-color:#1f1f22;backdrop-filter:none;-webkit-backdrop-filter:none}
+.hv{text-shadow:none}.hm::after{background:rgba(255,255,255,.12)}
+.chips>*{color:#d4d4d8;background:#111113;border-color:#1f1f22}
+#spl{background:#000}.sp-logo{filter:drop-shadow(0 0 18px rgba(255,255,255,.12))}.sp-shadow{background:rgba(255,255,255,.18)}
+.sp-line path{stroke:#e4e4e7;filter:none}.sp-dot{fill:#fff;filter:drop-shadow(0 0 6px rgba(255,255,255,.6))}.sp-pill b{color:#00ba7c}.sp-eq{color:#e4e4e7}
+.tcc{background:rgba(11,11,12,.95)}.term{background:#050505;border-color:#1f1f22}
+.lbl.sec .lnk{color:#d4d4d8}
