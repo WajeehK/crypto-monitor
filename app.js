@@ -179,7 +179,7 @@ async function dec(buf){const u=new Uint8Array(buf);if(u[0]!==67||u[1]!==84||u[2
 async function getBlob(path){const r=await fetch(RAW+path,{cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw new Error('http '+r.status);return dec(await r.arrayBuffer())}
 function accept(b,fromCache){if(!b||!b.state)return;if(BLOB&&b.pushed_at<=BLOB.pushed_at)return;BLOB=b;
  if(!fromCache)try{localStorage.setItem('ct_cache',JSON.stringify(b))}catch(_){}
- S=JSON.parse(JSON.stringify(b.state));S.push=b.push;S.tmap=b.tmap||{};S.pushed_at=b.pushed_at;wsEnsure();applyLive();render();
+ S=JSON.parse(JSON.stringify(b.state));S.push=b.push;S.box=b.box;S.tmap=b.tmap||{};S.pushed_at=b.pushed_at;wsEnsure();applyLive();render();
  if(deep){const m=deep;deep=null;history.replaceState(null,'',location.pathname+location.search);openView(m[1],decodeURIComponent(m[2]))}}
 function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_cache');showNoKey('Saved key no longer works. Enter your password again.')}
 function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';const inp=$('#nkin'),btn=$('#nkgo');setTimeout(()=>inp.focus(),50);
@@ -497,7 +497,15 @@ async function alCheck(){const act=ALR.filter(a=>!a.hit);if(!act.length)return;
  alSave();if(V&&V.redrawAl)V.redrawAl()}
 setInterval(()=>{if(!document.hidden)alCheck()},30000);setTimeout(alCheck,3000);
 /* ---------- Sell button: signed close request -> box (Tailscale Funnel /cm) -> close-requests/<id>.json -> Crypto Trader ---------- */
-const BOX='https://crypto-box.tailc9dc5b.ts.net/cm';
+const BOX0='https://crypto-box.tailc9dc5b.ts.net/cm';
+// v20: endpoint comes from the encrypted payload (S.box) so a changed URL is followed; last known kept on device
+const boxURL=()=>{const u=S&&S.box;if(u&&/^https:\/\//.test(u)){localStorage.setItem('ct_box',u);return u}return localStorage.getItem('ct_box')||BOX0};
+const tfetch=(u,o,ms)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);return fetch(u,Object.assign({cache:'no-store',signal:c.signal},o)).finally(()=>clearTimeout(t))};
+async function aesEnc(obj){const raw=Uint8Array.from(atob(localStorage.getItem('ct_k').replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
+ const k=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt']),iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode('ctmon')},k,new TextEncoder().encode(JSON.stringify(obj))));
+ const u=new Uint8Array(15+ct.length);u.set([67,84,49]);u.set(iv,3);u.set(ct,15);let b='';u.forEach(x=>b+=String.fromCharCode(x));return btoa(b)}
+const uuid4=()=>crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
 async function hsig(msg){const raw=Uint8Array.from(atob(localStorage.getItem('ct_k').replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
  const k=await crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign']);
  return [...new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)))].map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -507,15 +515,26 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
  document.body.appendChild(d);const st=d.querySelector('#sellst'),ok=d.querySelector('#sellok'),no=d.querySelector('#sellno');let busy=false;
  no.onclick=()=>{if(!busy)d.remove();else{d.remove()}};
  ok.onclick=async()=>{if(busy)return;busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
-  try{const pl=JSON.stringify({pair:p.symbol,side:p.side,entry_price:p.entry,ts:Date.now()/1000,nonce:crypto.getRandomValues(new Uint32Array(2)).join('-')});
-   const r=await fetch(BOX+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({p:pl,s:await hsig(pl)})});const j=await r.json();
-   if(!r.ok||!j.id)throw new Error(j.error||('HTTP '+r.status));st.textContent='Sent. Waiting for Crypto Trader…';ok.textContent='Pending…';
-   const t0=Date.now();while(Date.now()-t0<60000){await new Promise(x=>setTimeout(x,2000));if(!d.isConnected)return;
-    try{const q=await (await fetch(BOX+'/close/'+j.id,{cache:'no-store'})).json();
+  const id=uuid4();let j=null,queued=false,lastErr='';
+  try{const pl=JSON.stringify({pair:p.symbol,side:p.side,entry_price:p.entry,ts:Date.now()/1000,nonce:crypto.getRandomValues(new Uint32Array(2)).join('-'),id});
+   const body=JSON.stringify({p:pl,s:await hsig(pl)});
+   // 1) direct to the box, 4 tries over ~25s (box may be waking up)
+   for(let a=1;a<=4&&!j;a++){
+    try{const r=await tfetch(boxURL()+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body},9000);const x=await r.json();
+     if(r.ok&&x.id){j=x;break}if(r.status>=400&&r.status<500)throw Object.assign(new Error(x.error||('HTTP '+r.status)),{fatal:true});lastErr='HTTP '+r.status}
+    catch(e){if(e.fatal)throw e;lastErr=e.name==='AbortError'?'timed out':'no connection'}
+    if(a<4){st.textContent=`Box not answering (${lastErr}), retrying ${a+1}/4…`;await new Promise(x=>setTimeout(x,2000*a))}}
+   // 2) backup queue: same signed request, encrypted, via ntfy.sh; the box picks it up when reachable (valid 10 min)
+   if(!j){const r=await tfetch('https://ntfy.sh/ctq'+(await hsig('ct-close-q')).slice(0,32),{method:'POST',body:await aesEnc(JSON.parse(body))},10000);
+    if(!r.ok)throw new Error('box unreachable and backup queue failed (HTTP '+r.status+')');queued=true;j={id}}
+   st.textContent=queued?'Box unreachable, sent via backup queue. It will close as soon as the box answers (request valid 10 min)…':'Sent. Waiting for Crypto Trader…';ok.textContent='Pending…';
+   const t0=Date.now(),lim=queued?600000:60000;while(Date.now()-t0<lim){await new Promise(x=>setTimeout(x,2500));if(!d.isConnected)return;
+    try{const q=await (await tfetch(boxURL()+'/close/'+j.id,{},8000)).json();
      if(q.status==='closed'){st.innerHTML=`<b class="up">Closed at $${px(q.exit_price)}, P&amp;L <span class="${cls(q.pnl)}">${usd(q.pnl,1)}</span></b>`;ok.textContent='Done';return}
-     if(q.status==='rejected'){st.innerHTML=`<b class="dn">Rejected: ${esc(q.reason||'no reason given')}</b>`;ok.textContent='Rejected';return}}catch(_){}}
-   st.innerHTML='<b class="warn">No response yet, Crypto Trader may be offline.</b>';ok.textContent='No response'}
-  catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
+     if(q.status==='rejected'){st.innerHTML=`<b class="dn">Rejected: ${esc(q.reason||'no reason given')}</b>`;ok.textContent='Rejected';return}
+     if(queued&&q.status==='pending')st.textContent='Box received it. Waiting for Crypto Trader…'}catch(_){}}
+   st.innerHTML=queued?'<b class="warn">Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.</b>':'<b class="warn">No response yet, Crypto Trader may be offline.</b>';ok.textContent='No response'}
+  catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was closed. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
 (()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
 $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
 /* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
