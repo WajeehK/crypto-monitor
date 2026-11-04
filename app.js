@@ -495,14 +495,14 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
 (()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
 $('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
 /* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
-(()=>{if(RM)return;const seen=new WeakSet(),prev=new WeakMap(),busy=new WeakSet();
+(()=>{if(RM)return;const seen=new WeakSet(),prev=new Map(),busy=new WeakSet();
  const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
  const parse=t=>{const m=String(t).match(/([−-])?\$?([\d,]*\.?\d+)/);return m?{v:(m[1]?-1:1)*parseFloat(m[2].replace(/,/g,'')),s:m[0],d:(m[2].split('.')[1]||'').length}:null};
  function countUp(el,n){busy.add(el);const tpl=el.textContent,t0=performance.now(),D=700;
   const step=t=>{const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,3),v=Math.abs(n.v)*e;
    el.textContent=tpl.replace(n.s,n.s.replace(/[\d,]*\.?\d+/,v.toLocaleString('en-GB',{minimumFractionDigits:n.d,maximumFractionDigits:n.d})));
    if(k<1)requestAnimationFrame(step);else{el.textContent=tpl;busy.delete(el)}};requestAnimationFrame(step)}
- function scan(){document.querySelectorAll(NUMS).forEach(el=>{if(busy.has(el))return;const n=parse(el.textContent);if(!n)return;const p=prev.get(el);prev.set(el,n.v);
+ function scan(){document.querySelectorAll(NUMS).forEach(el=>{if(busy.has(el))return;const n=parse(el.textContent);if(!n)return;const r=el.closest('[data-cid],[data-sym],[data-tid]'),st=el.closest('.st'),key=(r?JSON.stringify(r.dataset):'')+'|'+(st?st.querySelector('.k').textContent:(el.previousElementSibling||el.parentNode.firstElementChild||el).textContent)+'|'+[...el.parentNode.children].indexOf(el);const p=prev.get(key);prev.set(key,n.v);
    if(p===undefined){if(el.matches('.st .v')&&n.v)countUp(el,n);return}
    if(n.v!==p){el.classList.remove('fxup','fxdn');void el.offsetWidth;el.classList.add(n.v>p?'fxup':'fxdn')}});
   document.querySelectorAll('[data-view]:not([hidden]) :is(#positions,#stats,#feed,#latest,#minilog,#act,#mklist,#mkglob,#statsMain), #vbody').forEach(c=>{
