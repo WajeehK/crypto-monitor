@@ -14,8 +14,16 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=13">
+<link rel="stylesheet" href="app.css?v=14">
 </head><body>
+<div id="spl" aria-hidden="true"><div class="sp-in"><img src="icon.svg" class="sp-logo" alt=""><svg class="sp-line" viewBox="0 0 240 70"><path pathLength="1" d="M0 58 L18 52 L30 56 L46 40 L60 46 L78 30 L92 36 L110 22 L126 28 L144 16 L160 24 L178 12 L196 18 L214 8 L240 4"/><circle class="sp-dot" cx="240" cy="4" r="4"/></svg>
+<div class="sp-t">Crypto Trader</div><div class="sp-pill">PAPER · <b>LIVE</b></div><div class="sp-eq" id="speq"></div></div></div>
+<script>(function(){var s=document.getElementById('spl'),R=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(sessionStorage.getItem('ct_spl')){s.remove();return}sessionStorage.setItem('ct_spl',1);document.documentElement.classList.add('spl-on');if(R)s.classList.add('rm');
+var done=0;function end(){if(done)return;done=1;s.classList.add('out');document.body.classList.add('intro');setTimeout(function(){s.remove();document.documentElement.classList.remove('spl-on')},R?200:450);setTimeout(function(){document.body.classList.remove('intro')},1600)}
+s.addEventListener('click',end);setTimeout(end,R?300:1450);
+window.__splEq=function(v){var e=document.getElementById('speq');if(!e||done||R||!(v>0))return;window.__splEq=null;var t0=performance.now();(function f(t){var k=Math.min(1,(t-t0)/600);k=1-Math.pow(1-k,3);e.textContent='$'+(v*k).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});e.classList.add('on');if(k<1)requestAnimationFrame(f)})(t0)}})();</script>
+
 <div class="bgfx" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i></div>
 <header class="top">
   <div class="brand"><img src="icon.svg" alt="" class="bi"><b>Crypto Trader</b><span class="mode">PAPER</span>
@@ -100,6 +108,6 @@
   <button class="tb" data-tab="stats"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Stats</span></button>
 </nav>
 <script src="lwc.js"></script>
-<script src="chart.js?v=13"></script>
-<script src="app.js?v=13"></script>
+<script src="chart.js?v=14"></script>
+<script src="app.js?v=14"></script>
 </body></html>

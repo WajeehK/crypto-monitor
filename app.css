@@ -274,3 +274,20 @@ body.lwfsopen{overflow:hidden}body.lwfsopen .dock{display:none}
 
 .st.wide{grid-column:1/-1}.st.wide .v{font-size:30px}.st.wide .tp{font-size:16px;font-weight:700;margin-left:8px;opacity:.85}
 .st.fng .gauge{position:absolute;right:8px;top:8px;width:64px;height:36px}.st.fng .needle{transform-origin:50px 50px;transform:rotate(var(--a));animation:fngIn 1.1s cubic-bezier(.2,1.4,.4,1)}@keyframes fngIn{from{transform:rotate(-90deg)}}.st.fng .tp{font-size:14px;font-weight:700;margin-left:4px}
+
+#spl{position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at 50% 42%,#071a12 0,#000 65%);display:flex;align-items:center;justify-content:center;transition:transform .45s cubic-bezier(.6,0,.3,1),opacity .45s;will-change:transform,opacity}
+#spl.out{transform:translateY(-100%);opacity:0}#spl.rm.out{transform:none}#spl.rm *{animation:none!important;opacity:1!important;stroke-dashoffset:0!important}
+.sp-in{display:flex;flex-direction:column;align-items:center;gap:10px}
+.sp-logo{width:76px;height:76px;border-radius:18px;filter:drop-shadow(0 0 18px #00ba7c);animation:spLogo .55s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes spLogo{from{transform:scale(.4);opacity:0}}
+.sp-line{width:220px;height:64px;overflow:visible}.sp-line path{fill:none;stroke:#00ba7c;stroke-width:2.5;stroke-linejoin:round;filter:drop-shadow(0 0 6px #00ba7c);stroke-dasharray:1;stroke-dashoffset:1;animation:spDraw .7s .2s ease-out forwards}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+.sp-dot{fill:#7dffc4;filter:drop-shadow(0 0 8px #00ba7c);opacity:0;transform-origin:240px 4px;animation:spDot .9s .85s ease-out forwards}
+@keyframes spDot{0%{opacity:0;transform:scale(.2)}30%{opacity:1;transform:scale(1.6)}100%{opacity:1;transform:scale(1)}}
+.sp-t{font-size:26px;font-weight:800;letter-spacing:-.02em;color:#e7e9ea;animation:spUp .45s .45s both}
+.sp-pill{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:#71767b;border:1px solid #2f3336;border-radius:99px;padding:3px 10px;animation:spUp .45s .6s both}.sp-pill b{color:#00ba7c}
+@keyframes spUp{from{opacity:0;transform:translateY(10px)}}
+.sp-eq{font-family:var(--mono);font-size:18px;font-weight:700;color:#7dffc4;opacity:0;transition:opacity .2s;min-height:22px}.sp-eq.on{opacity:1}
+body.intro .st,body.intro .pos{animation:cardIn .5s cubic-bezier(.2,.9,.3,1) both}
+body.intro .st:nth-child(2){animation-delay:.06s}body.intro .st:nth-child(3){animation-delay:.12s}body.intro .st:nth-child(4){animation-delay:.18s}body.intro .st:nth-child(5){animation-delay:.24s}body.intro .pos{animation-delay:.3s}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.98)}}

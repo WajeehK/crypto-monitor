@@ -140,7 +140,7 @@ async function loadFng(){if(FNG&&Date.now()-FNG.at<6e5)return;try{const r=await 
  FNG={v:+d[0].value,c:d[0].value_classification,p:d[1]?+d[1].value:null,at:Date.now()};localStorage.setItem('ct-fng',JSON.stringify(FNG));const el=$('#fng');if(el)el.outerHTML=fngHTML()}catch(e){}}
 loadFng();setInterval(loadFng,6e5);
 function render(){
- if(!S)return;fixHealth();const a=S.account,h=S.health;
+ if(!S)return;fixHealth();const a=S.account,h=S.health;if(window.__splEq)__splEq(a.equity);
  const age=h.age_s==null?'?':h.age_s<90?Math.round(h.age_s)+'s':Math.round(h.age_s/60)+'m';
  $('#meta').innerHTML=`<span>Heartbeat <b class="${h.stale?'bad':''}">${age} ago${h.stale?' · STALE':''}</b></span><span>Cycle <b>${h.cycle_ms??'—'} ms</b></span><span>Mode <b>${esc(h.mode||'—')}</b></span><span>Errors <b class="${h.errors?'bad':''}">${h.errors??'—'}</b></span><span>PID <b>${h.pid??'—'}</b></span>`;
  $('#stats').innerHTML=[['Equity (est)',usd(a.equity),'started at '+usd(a.start),'#1d9bf0',''],['Total P&L',usd(a.total_pnl,1),pct(a.total_pct),a.total_pnl>=0?'#00ba7c':'#f91880',cls(a.total_pnl)],
