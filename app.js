@@ -140,7 +140,7 @@ async function loadFng(){if(FNG&&Date.now()-FNG.at<6e5)return;try{const r=await 
  FNG={v:+d[0].value,c:d[0].value_classification,p:d[1]?+d[1].value:null,at:Date.now()};localStorage.setItem('ct-fng',JSON.stringify(FNG));const el=$('#fng');if(el)el.outerHTML=fngHTML()}catch(e){}}
 loadFng();setInterval(loadFng,6e5);
 function mood(el,m){if(el)el.className=el.className.replace(/\bm-(happy|worried|sleepy|calm)\b/g,'').trim()+' m-'+m}
-function hero(a,h){const t=TODAY||{d:0,pc:0,n:0},m=h.stale?'sleepy':t.d>0.005?'happy':t.d<-0.005?'worried':'calm';mood($('#hmas'),m);mood($('#mhead'),m);
+function hero(a,h){const t=TODAY||{d:0,pc:0,n:0},m=h.stale?'sleepy':t.d>0.005?'happy':t.d<-0.005?'worried':'calm';window.__ctMood=m;mood($('#hmas'),m);mood($('#mhead'),m);
  $('#heq').textContent=usd(a.equity);const p=$('#hpill');p.className='hpill '+(t.d>=0?'up':'dn');p.textContent=(t.d>=0?'▲ ':'▼ ')+usd(Math.abs(t.d))+' ('+pct(t.pc)+') today';
  $('#hsub').textContent=h.stale?'bot is napping · heartbeat stale':`${S.positions.length} open · ${t.n} closed today`}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-jump]');if(b){const el=$('#'+b.dataset.jump);el&&el.scrollIntoView({behavior:RM?'auto':'smooth',block:'start'})}});
