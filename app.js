@@ -177,10 +177,12 @@ async function dec(buf){const u=new Uint8Array(buf);if(u[0]!==67||u[1]!==84||u[2
  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:u.slice(3,15),additionalData:new TextEncoder().encode('ctmon')},KEY,u.slice(15));
  return JSON.parse(await new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream('gzip'))).text())}
 async function getBlob(path){const r=await fetch(RAW+path,{cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw new Error('http '+r.status);return dec(await r.arrayBuffer())}
-function accept(b,fromCache){if(!b||!b.state)return;if(BLOB&&b.pushed_at<=BLOB.pushed_at)return;BLOB=b;
+let FRESH_AT=0,VIS_AT=Date.now(),ticking=false;
+function accept(b,fromCache){if(!b||!b.state)return;if(!fromCache&&(b.live||Date.now()/1000-b.pushed_at<90))FRESH_AT=Date.now();if(BLOB&&b.pushed_at<=BLOB.pushed_at)return;BLOB=b;
  if(!fromCache)try{localStorage.setItem('ct_cache',JSON.stringify(b))}catch(_){}
  S=JSON.parse(JSON.stringify(b.state));S.push=b.push;S.box=b.box;S.tmap=b.tmap||{};S.pushed_at=b.pushed_at;wsEnsure();applyLive();render();
- if(deep){const m=deep;deep=null;history.replaceState(null,'',location.pathname+location.search);openView(m[1],decodeURIComponent(m[2]))}}
+ if(V&&V.kind==='pos'&&V.wait)renderPosView(V.arg);
+ if(deep&&!fromCache){const m=deep;deep=null;history.replaceState(null,'',location.pathname+location.search);openView(m[1],decodeURIComponent(m[2]))}}
 function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_cache');showNoKey('Saved key no longer works. Enter your password again.')}
 function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';const inp=$('#nkin'),btn=$('#nkgo');setTimeout(()=>inp.focus(),50);
  const go=async()=>{const pw=inp.value;if(!pw||btn.disabled)return;btn.disabled=true;btn.textContent='Unlocking…';$('#nkerr').textContent='';
@@ -192,8 +194,13 @@ function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textCon
   catch(e){inp.value='';inp.classList.remove('shake');void inp.offsetWidth;inp.classList.add('shake');$('#nkerr').textContent=e&&e.name==='OperationError'?'Wrong password':"Couldn't check the password — are you online?";btn.textContent='Wait…';
    setTimeout(()=>{btn.disabled=false;btn.textContent='Unlock';inp.focus()},2000)}};
  btn.onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()}}
-async function tick(){if(!KEY||(document.hidden&&BLOB))return;const now=Date.now()/1000,slot=Math.floor((now-15)/60);
+async function tick(){if(!KEY||(document.hidden&&BLOB)||ticking)return;ticking=true;try{await tick2()}finally{ticking=false}}
+// v21: fresh data straight from the box (encrypted, written every 2s) every 5s while the app is open; GitHub is the fallback
+async function boxData(){try{const r=await tfetch(boxURL()+'/state?t='+Date.now(),{},4500);if(!r.ok)return false;const b=await dec(await r.arrayBuffer());accept(b);return true}
+ catch(e){if(e&&e.name==='OperationError')throw e;return false}}
+async function tick2(){const now=Date.now()/1000,slot=Math.floor((now-15)/60);
  try{
+  if(await boxData()){netFail=0;status();return}
   // a new file path every minute (s/<unix-minute>.bin) -> GitHub's raw CDN serves it fresh
   if(slot>lastSlot){lastSlot=slot;for(const x of (BLOB?[slot,slot-1]:[slot,slot-1,slot-2,slot-3])){if(BLOB&&BLOB.slot>=x)break;if(tried.has(x))continue;tried.add(x);const b=await getBlob('data/s/'+x+'.bin');if(b){accept(b);break}}}
   // fallback (first open, or the minute files were missed): resolve the branch head once every 3 min via the API (60/h limit)
@@ -344,9 +351,21 @@ async function renderTrade(id){
  $('#tdet').querySelectorAll('[data-tid]').forEach(el=>el.onclick=()=>openView('trade',el.dataset.tid));
 }
 
-function renderPosView(sym){
+function renderPosView(arg){
+ // arg = SYM or SYM@<opened unix s> (from a trade-opened notification)
+ const [sym,atS]=String(arg).split('@'),at=+atS||0;
  const P=()=>S&&S.positions.find(p=>p.symbol===sym);let p=P();
- if(!p){vtitle.textContent='Position closed';vbody.innerHTML='<div class="empty">This position is no longer open.</div>';return}
+ if(V)V.wait=false;
+ if(!p){const fresh=Date.now()-FRESH_AT<15000,waited=Date.now()-VIS_AT>15000;
+  const tms=x=>(Date.parse(x||'')||0)/1000;
+  const ct=S&&(S.trades||[]).filter(t=>t.symbol===sym&&t.reason!=='partial_take_profit'&&(at?(tms(t.time)>=at-60):fresh)).sort((a,b)=>tms(b.time)-tms(a.time))[0];
+  if(ct&&(fresh||at)){vtitle.textContent='Position closed';
+   vbody.innerHTML=`<div class="empty">${esc(ct.coin||sym)} ${esc(ct.side||'')} closed ${when(ct.time)}<br>Exit <b>$${px(ct.exit)}</b> · P&amp;L <b class="${cls(ct.pnl)}">${usd(ct.pnl,1)}</b><br><button class="pill ghost press" id="pcgo" style="margin-top:14px">Trade details</button></div>`;
+   $('#pcgo').onclick=()=>openView('trade',ct.id);return}
+  if(!fresh&&!waited){if(V)V.wait=true;vtitle.textContent=sym.replace(/^PF_|USD$/g,'');vbody.innerHTML='<div class="empty">Loading the latest data…</div>';
+   setTimeout(()=>{if(V&&V.kind==='pos'&&V.arg===arg&&V.wait)renderPosView(arg)},15500-(Date.now()-VIS_AT));return}
+  vtitle.textContent=fresh?'Position closed':'Position not found';
+  vbody.innerHTML=`<div class="empty">${fresh?'This position is no longer open.':'Not in the latest data I could load ('+(BLOB?hm(new Date(BLOB.pushed_at*1000).toISOString()):'none')+'). The box may be offline; pull down or reopen in a moment.'}</div>`;if(!fresh&&V)V.wait=true;return}
  $('#vlive').hidden=false;vtitle.innerHTML=`${ci(p.coin,28)}<span>${esc(p.coin)} ${p.side==='long'?'long':'short'}</span>`;
  let tfv=tf[sym+'_v']||'5m';
  vbody.innerHTML=`<div id="phero"></div><div class="tfrow"><div class="seg sm" id="vtf"><span class="sb"></span>${['1m','5m','15m','1h'].map(x=>`<button class="press ${x===tfv?'on':''}" data-tf="${x}">${x}</button>`).join('')}</div><span class="mut" style="font-size:13px" id="vtick"></span></div>
@@ -423,17 +442,17 @@ addEventListener('appinstalled',()=>inst.hidden=true);
  main.onclick=async()=>{main.disabled=true;try{main.classList.contains('on')?await disable():await enable()}catch(e){st.textContent='error';info.textContent='Could not enable notifications: '+(e.message||e)}main.disabled=false};
  $$('#npTypes [data-pref]').forEach(b=>b.onclick=async()=>{prefs[b.dataset.pref]=!prefs[b.dataset.pref];localStorage.setItem(PK,JSON.stringify(prefs));setT(b,prefs[b.dataset.pref]);const s=await sub();if(s)relay({op:'prefs',sub:s.toJSON(),prefs}).catch(()=>{})});
  test.onclick=async()=>{const s=await sub();if(!s)return;test.disabled=true;test.textContent='Sending…';try{await relay({op:'test',sub:s.toJSON(),prefs});test.textContent='Sent — should arrive in a few seconds'}catch(e){test.textContent='Failed: '+e.message}setTimeout(()=>{test.textContent='Send test notification';test.disabled=false},6000)};
- if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'){const h=new URL(e.data.url).hash;if(h&&h!==location.hash)location.hash=h}});
+ if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'){const h=new URL(e.data.url).hash;if(h&&h!==location.hash){VIS_AT=Date.now();location.hash=h;tick()}}});
  refresh().catch(()=>{});window.__push={refresh,enable,sub};
 })();
 
 addEventListener('resize',()=>{sizeBubble();$$('.seg').forEach(segMove);drawCharts()});
 (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{sizeBubble();$$('.seg').forEach(segMove)});sizeBubble();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){lastSlot=Math.min(lastSlot,Math.floor(Date.now()/60000)-2);tick();wsEnsure()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){VIS_AT=Date.now();lastSlot=Math.min(lastSlot,Math.floor(Date.now()/60000)-2);tick();wsEnsure()}});
 addEventListener('online',()=>{netFail=0;tick()});addEventListener('offline',status);
 (async()=>{if(!await loadKey()){showNoKey();return}
  const c=localStorage.getItem('ct_cache');if(c)try{accept(JSON.parse(c),true)}catch(_){}
- status();tick();setInterval(tick,REFRESH)})();
+ status();tick();setInterval(tick,REFRESH);setTimeout(()=>{if(deep&&S){const m=deep;deep=null;openView(m[1],decodeURIComponent(m[2]),true)}},15000)})();
 /* ---------- Markets tab (CoinMarketCap data, refreshed on the box every 10 min -> data/markets.json) ---------- */
 let MK=null,mkSort='rank',mkQ='',mkAt=0;
 try{MK=JSON.parse(localStorage.getItem('ct_mk')||'null')}catch(_){}
@@ -497,10 +516,10 @@ async function alCheck(){const act=ALR.filter(a=>!a.hit);if(!act.length)return;
  alSave();if(V&&V.redrawAl)V.redrawAl()}
 setInterval(()=>{if(!document.hidden)alCheck()},30000);setTimeout(alCheck,3000);
 /* ---------- Sell button: signed close request -> box (Tailscale Funnel /cm) -> close-requests/<id>.json -> Crypto Trader ---------- */
-const BOX0='https://crypto-box.tailc9dc5b.ts.net/cm';
+const BOX0='https://crypto-box.tailc9dc5b.ts.net/cm';  // also hard-coded in boxURL() (hoisted, used before this line runs)
 // v20: endpoint comes from the encrypted payload (S.box) so a changed URL is followed; last known kept on device
-const boxURL=()=>{const u=S&&S.box;if(u&&/^https:\/\//.test(u)){localStorage.setItem('ct_box',u);return u}return localStorage.getItem('ct_box')||BOX0};
-const tfetch=(u,o,ms)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);return fetch(u,Object.assign({cache:'no-store',signal:c.signal},o)).finally(()=>clearTimeout(t))};
+function boxURL(){const u=S&&S.box;if(u&&/^https:\/\//.test(u)){if(localStorage.getItem('ct_box')!==u)localStorage.setItem('ct_box',u);return u}return localStorage.getItem('ct_box')||'https://crypto-box.tailc9dc5b.ts.net/cm'}
+function tfetch(u,o,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);return fetch(u,Object.assign({cache:'no-store',signal:c.signal},o)).finally(()=>clearTimeout(t))}
 async function aesEnc(obj){const raw=Uint8Array.from(atob(localStorage.getItem('ct_k').replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
  const k=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt']),iv=crypto.getRandomValues(new Uint8Array(12));
  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode('ctmon')},k,new TextEncoder().encode(JSON.stringify(obj))));
