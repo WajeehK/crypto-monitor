@@ -623,7 +623,7 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
   if(!seen){SV('ct_seen',ids.slice(0,200));}else{const nw=S.trades.filter(t=>!seen.includes(t.id)&&Date.now()-pd(t.time)<6*3600e3);nw.slice(0,3).reverse().forEach((t,i)=>setTimeout(()=>closedFx(t),i*3200));if(S.trades.some(t=>!seen.includes(t.id)))SV('ct_seen',[...new Set([...ids,...seen])].slice(0,200))}
   // v22: trade-opened overlay (once per open). Seed on first run so old positions don't all animate.
   let seenO=LS('ct_seen_open',null);const keys=S.positions.map(openKey);
-  if(!seenO){const skip=window.__deepPos&&String(window.__deepPos).split('@')[0];
+  if(seenO==null){const skip=window.__deepPos&&String(window.__deepPos).split('@')[0];
    const seed=keys.filter(k=>!skip||!k.startsWith(skip+'|'));SV('ct_seen_open',seed.slice(0,100));seenO=seed}
   else{const skip=window.__deepPos&&String(window.__deepPos).split('@')[0];
    const nw=S.positions.filter(p=>!seenO.includes(openKey(p))&&Date.now()-pd(p.opened)<6*3600e3&&p.symbol!==skip);
