@@ -1,1 +1,2 @@
 Coin icons: @web3icons/core 4.0.58 (MIT) and cryptocurrency-icons 0.18.1 (CC0-1.0). Logos are trademarks of their projects.
+ASTER logo: CoinMarketCap static asset id 36341 (Aster), embedded as SVG; trademark of the Aster project.

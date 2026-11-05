@@ -142,7 +142,7 @@ section{will-change:transform,opacity}
 [hidden]{display:none!important}
 /* ---------- v4: coin icons, detail views ---------- */
 .ci{display:inline-block;width:var(--s,22px);height:var(--s,22px);border-radius:50%;vertical-align:middle;flex:0 0 auto;object-fit:cover;background:#15181c}
-.ci.lt{display:inline-grid;place-items:center;font-size:calc(var(--s,22px)*.42);font-weight:800;color:#fff;background:#2a2f36;font-family:var(--sans)}
+.ci.lt{display:inline-grid;place-items:center;font-size:calc(var(--s,22px)*.42);font-weight:800;color:#e7e9ea;background:radial-gradient(circle at 30% 28%,#3a3f48,#1a1d22);font-family:var(--sans);border:1px solid #2f3336}
 .wtrack .ci{--s:16px;margin-right:4px;vertical-align:-3px}
 .tr,.pos .pos-h,.pos .pos-b,.lr.lk{cursor:pointer}
 .tr{transition:background .2s}.tr:active{background:#111417}
@@ -296,6 +296,9 @@ body.intro .st:nth-child(2){animation-delay:.06s}body.intro .st:nth-child(3){ani
 .tco{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);animation:tcoIn .25s both}
 .tco.fly{background:transparent;transition:background .5s}.tcc{background:var(--panel);border:1px solid var(--bd);border-radius:22px;padding:22px 28px;min-width:260px;text-align:center;transition:transform .6s cubic-bezier(.6,0,.4,1),opacity .6s;animation:tccIn .45s cubic-bezier(.2,1.4,.4,1) both}
 .tco.fly .tcc{opacity:.2}.tco.win .tcc{box-shadow:0 0 0 1px #00ba7c,0 0 40px rgba(0,186,124,.45)}.tco.loss .tcc{box-shadow:0 0 0 1px #f91880,0 0 30px rgba(249,24,128,.3);animation:tccIn .45s both,shake .45s .3s}
+.tco.open .tcc{box-shadow:0 0 0 1px #1d9bf0,0 0 40px rgba(29,155,240,.4)}
+.tco.open .tcp.openp{color:#e7e9ea;font-variant-numeric:tabular-nums}
+.tco.open .tck{color:#1d9bf0}
 .tck{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--mu);text-transform:uppercase}.tcn{display:flex;align-items:center;justify-content:center;gap:8px;font-size:22px;font-weight:800;margin-top:8px}
 .tside{font-size:11px;font-family:var(--mono);border:1px solid currentColor;border-radius:6px;padding:1px 6px}.tcp{font-size:44px;font-weight:800;margin:6px 0 2px;letter-spacing:-.02em}.tcx{color:var(--mu);font-size:13.5px}
 @keyframes tcoIn{from{opacity:0}}@keyframes tccIn{from{transform:scale(.6);opacity:0}}@keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}

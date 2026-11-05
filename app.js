@@ -7,7 +7,12 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS=['home','trades','markets','activity','stats'];
 let S=null, tab='home', filt='all', failed=0, tf={}, charts={}, posData={}, ICONS=new Set();
 fetch('coins/index.json',{credentials:'same-origin'}).then(r=>r.json()).then(a=>{ICONS=new Set(a);if(S)render()}).catch(()=>{});
-const ci=(c,sz)=>{c=String(c||'?');const l=c.toLowerCase(),st=sz?` style="--s:${sz}px"`:'';return ICONS.has(l)?`<img class="ci" src="coins/${l}.svg" alt=""${st}>`:`<span class="ci lt"${st}>${esc(c.slice(0,1))}</span>`};
+const ci=(c,sz)=>{c=String(c||'?');const l=c.toLowerCase(),st=sz?` style="--s:${sz}px"`:'',fb=`<span class="ci lt"${st}>${esc(c.slice(0,1))}</span>`;
+ // local pack first; else CoinMarketCap via markets data (covers new listings like ASTER until we ship a local file); else letter
+ if(ICONS.has(l))return `<img class="ci" src="coins/${l}.svg" alt=""${st} onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ci lt',style:this.style.cssText,textContent:'${esc(c.slice(0,1))}'}))">`;
+ const m=typeof MK!=='undefined'&&MK&&MK.coins&&MK.coins.find(x=>String(x[2]).toLowerCase()===l);
+ if(m)return `<img class="ci" src="https://s2.coinmarketcap.com/static/img/coins/64x64/${m[0]}.png" alt=""${st} referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ci lt',style:this.style.cssText,textContent:'${esc(c.slice(0,1))}'}))">`;
+ return fb};
 const usd=(v,sign)=>v==null?'—':(sign&&v>0?'+':v<0?'−':'')+'$'+Math.abs(v).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=v=>v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2)+'%';
 const px=v=>{if(v==null)return '—';const a=Math.abs(v);const d=a>=1000?1:a>=10?2:a>=1?3:a>=0.1?5:6;return v.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d})};
@@ -180,9 +185,14 @@ async function getBlob(path){const r=await fetch(RAW+path,{cache:'no-store'});if
 let FRESH_AT=0,VIS_AT=Date.now(),ticking=false;
 function accept(b,fromCache){if(!b||!b.state)return;if(!fromCache&&(b.live||Date.now()/1000-b.pushed_at<90))FRESH_AT=Date.now();if(BLOB&&b.pushed_at<=BLOB.pushed_at)return;BLOB=b;
  if(!fromCache)try{localStorage.setItem('ct_cache',JSON.stringify(b))}catch(_){}
- S=JSON.parse(JSON.stringify(b.state));S.push=b.push;S.box=b.box;S.tmap=b.tmap||{};S.pushed_at=b.pushed_at;wsEnsure();applyLive();render();
+ S=JSON.parse(JSON.stringify(b.state));S.push=b.push;S.box=b.box;S.tmap=b.tmap||{};S.pushed_at=b.pushed_at;wsEnsure();applyLive();
+ // v22: stash a pos deep-link so detect() does not also queue the open animation; play anim after render, then land on the position
+ let deepNow=null;if(deep&&!fromCache){deepNow=deep;deep=null;history.replaceState(null,'',location.pathname+location.search);if(deepNow[1]==='pos')window.__deepPos=decodeURIComponent(deepNow[2])}
+ render();
  if(V&&V.kind==='pos'&&V.wait)renderPosView(V.arg);
- if(deep&&!fromCache){const m=deep;deep=null;history.replaceState(null,'',location.pathname+location.search);openView(m[1],decodeURIComponent(m[2]))}}
+ if(deepNow){const arg=deepNow[1]==='pos'?decodeURIComponent(deepNow[2]):decodeURIComponent(deepNow[2]);window.__deepPos=null;
+  if(deepNow[1]==='pos'&&window.__x15&&__x15.maybeOpenAnim(arg))return;
+  openView(deepNow[1],arg)}}
 function badKey(){localStorage.removeItem('ct_k');localStorage.removeItem('ct_cache');showNoKey('Saved key no longer works. Enter your password again.')}
 function showNoKey(err){const nk=$('#nokey');nk.hidden=false;$('#nkerr').textContent=err||'';const inp=$('#nkin'),btn=$('#nkgo');setTimeout(()=>inp.focus(),50);
  const go=async()=>{const pw=inp.value;if(!pw||btn.disabled)return;btn.disabled=true;btn.textContent='Unlocking…';$('#nkerr').textContent='';
@@ -585,6 +595,23 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
  function confetti(){if(RM)return;const c=document.createElement('canvas');c.className='confetti';const d=devicePixelRatio||1;c.width=innerWidth*d;c.height=innerHeight*d;document.body.appendChild(c);const g=c.getContext('2d');g.scale(d,d);
   const P=[...Array(110)].map(()=>({x:innerWidth/2,y:innerHeight*.42,vx:(Math.random()-.5)*12,vy:-Math.random()*13-3,r:Math.random()*6.28,s:4+Math.random()*5,c:['#00ba7c','#7dffc4','#ffd400','#1d9bf0','#a78bfa'][Math.random()*5|0]}));const t0=performance.now();
   (function f(t){g.clearRect(0,0,innerWidth,innerHeight);P.forEach(p=>{p.vy+=.35;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=.2;g.save();g.translate(p.x,p.y);g.rotate(p.r);g.fillStyle=p.c;g.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);g.restore()});if(t-t0<1800)requestAnimationFrame(f);else c.remove()})(t0)}
+ function openFx(p,then){const o=document.createElement('div');o.className='tco open';
+  const lo=p.side==='long',sz=p.original_size||p.size;
+  o.innerHTML=`<div class="tcc"><div class="tcm mwrap m-happy cheer">${document.querySelector('#mhead').innerHTML}</div><div class="tck">Trade opened</div><div class="tcn">${ci(p.coin,40)} ${esc(p.coin)} <span class="tside ${lo?'up':'dn'}">${lo?'LONG':'SHORT'}</span></div><div class="tcp openp">${px(p.entry)}</div><div class="tcx">${qty(sz)}${p.leverage?' · '+p.leverage+'×':''} · ${when(p.opened)}</div></div>`;
+  document.body.appendChild(o);SFX.open();let gone=0;
+  const fly=()=>{if(gone)return;gone=1;const tb=tbs[TABS.indexOf('home')],cr=o.querySelector('.tcc').getBoundingClientRect(),br=tb.getBoundingClientRect();
+   o.querySelector('.tcc').style.transform=`translate(${br.left+br.width/2-(cr.left+cr.width/2)}px,${br.top+br.height/2-(cr.top+cr.height/2)}px) scale(.08)`;o.classList.add('fly');
+   setTimeout(()=>{o.remove();tb.classList.add('tbping');setTimeout(()=>tb.classList.remove('tbping'),700);if(typeof then==='function')then()},RM?50:550)};
+  o.addEventListener('click',fly);setTimeout(fly,RM?1200:2400)}
+ function queueOpen(p,then){openQ.push([p,then]);if(openQ.length===1)runOpenQ()}
+ function runOpenQ(){if(!openQ.length)return;const[p,then]=openQ[0];openFx(p,()=>{openQ.shift();if(typeof then==='function')then();runOpenQ()})}
+ function openKey(p){return p.symbol+'|'+(p.opened||'')}
+ function maybeOpenAnim(arg){const[sym]=String(arg).split('@');const p=S&&S.positions.find(x=>x.symbol===sym);if(!p)return false;
+  const k=openKey(p);let seen=LS('ct_seen_open',[]);
+  // already shown this open before → just open the position screen
+  if(seen.includes(k))return false;
+  SV('ct_seen_open',[k,...seen].slice(0,100));
+  queueOpen(p,()=>openView('pos',arg));return true}
  function closedFx(t){const win=(t.pnl||0)>0,o=document.createElement('div');o.className='tco '+(win?'win':'loss');
   o.innerHTML=`<div class="tcc"><div class="tcm mwrap m-${win?'happy cheer':'worried'}">${document.querySelector('#mhead').innerHTML}</div><div class="tck">Trade closed</div><div class="tcn">${ci(t.coin,40)} ${esc(t.coin)} <span class="tside ${t.side==='long'?'up':'dn'}">${esc(String(t.side||'').toUpperCase())}</span></div><div class="tcp ${win?'up':'dn'}">${usd(0,1)}</div><div class="tcx">exit ${px(t.exit)} · ${esc(reasons[t.reason]||human(t.reason))}</div></div>`;
   document.body.appendChild(o);(win?SFX.win:SFX.loss)();if(win)confetti();const pe=o.querySelector('.tcp'),t0=performance.now(),D=RM?1:900;
@@ -594,7 +621,15 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
   o.addEventListener('click',fly);setTimeout(fly,RM?1500:2800)}
  function detect(){const ids=S.trades.map(t=>t.id);let seen=LS('ct_seen',null);
   if(!seen){SV('ct_seen',ids.slice(0,200));}else{const nw=S.trades.filter(t=>!seen.includes(t.id)&&Date.now()-pd(t.time)<6*3600e3);nw.slice(0,3).reverse().forEach((t,i)=>setTimeout(()=>closedFx(t),i*3200));if(S.trades.some(t=>!seen.includes(t.id)))SV('ct_seen',[...new Set([...ids,...seen])].slice(0,200))}
-  const ps=S.positions.map(p=>p.symbol+p.opened).join();if(lastPos!=null){const old=lastPos.split(',');if(S.positions.some(p=>!old.includes(p.symbol+p.opened)))SFX.open()}lastPos=ps}
+  // v22: trade-opened overlay (once per open). Seed on first run so old positions don't all animate.
+  let seenO=LS('ct_seen_open',null);const keys=S.positions.map(openKey);
+  if(!seenO){const skip=window.__deepPos&&String(window.__deepPos).split('@')[0];
+   const seed=keys.filter(k=>!skip||!k.startsWith(skip+'|'));SV('ct_seen_open',seed.slice(0,100));seenO=seed}
+  else{const skip=window.__deepPos&&String(window.__deepPos).split('@')[0];
+   const nw=S.positions.filter(p=>!seenO.includes(openKey(p))&&Date.now()-pd(p.opened)<6*3600e3&&p.symbol!==skip);
+   nw.slice(0,3).reverse().forEach((p,i)=>setTimeout(()=>queueOpen(p,nw.length===1?()=>openView('pos',p.symbol):undefined),i*2800));
+   if(S.positions.some(p=>!seenO.includes(openKey(p))))SV('ct_seen_open',[...new Set([...keys,...seenO])].slice(0,100))}
+  const ps=S.positions.map(p=>p.symbol+p.opened).join();lastPos=ps}
  function term(){const T=$('#term');if(!T)return;if(T.offsetParent&&!T.dataset.s){T.dataset.s=1;requestAnimationFrame(()=>T.scrollTop=T.scrollHeight)}let el=T.firstElementChild;if(!el){el=document.createElement('div');T.appendChild(el)}const L=S.activity.slice(0,50).slice().reverse(),key=x=>x.time+x.text;
   const line=x=>{const d=pd(x.time),tm=ok(d)?d.toLocaleTimeString('en-GB',{timeZone:TZ}):'';return `<div class="tl ${x.tone||''}"><span class="tt">${tm}</span> <span class="tkk">${esc(KN[x.kind]||x.kind||'')}</span> <span class="tx">${esc(x.text)}</span></div>`};
   if(!termSeen){el.innerHTML=L.map(line).join('')+'<div class="tl cur">▍</div>';termSeen=new Set(L.map(key));T.scrollTop=T.scrollHeight;return}
@@ -629,7 +664,7 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
   c.toBlob(async b=>{const f=new File([b],'crypto-trader-recap.png',{type:'image/png'});window.__recap=c.toDataURL('image/png');
    try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Crypto Trader daily recap'});return}}catch(e){if(e.name==='AbortError')return}
    const u=URL.createObjectURL(b),l=document.createElement('a');l.href=u;l.download=f.name;l.click();setTimeout(()=>URL.revokeObjectURL(u),2000)},'image/png')}
- return {on(){if(!S)return;detect();term();stats()},closedFx,SFX,recap}})();
+ return {on(){if(!S)return;detect();term();stats()},closedFx,openFx,maybeOpenAnim,SFX,recap}})();
 window.__x15=X15;document.addEventListener('click',e=>{if(e.target.closest('.tb,[data-goto]'))setTimeout(()=>{const T=$('#term');if(T&&T.offsetParent)T.scrollTop=T.scrollHeight},60)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
