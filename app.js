@@ -6,6 +6,7 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s), REFRES
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS=['home','trades','markets','activity','stats'];
 let S=null, tab='home', filt='all', failed=0, tf={}, charts={}, posData={}, ICONS=new Set();
+const ENABLE_MODIFY_PARTIAL=false; // v23 flag. Keep false until Crypto Trader handles type=modify/partial (today any close-requests file is a full close). Flip to true and republish together with ENABLE_MODIFY_PARTIAL in gh/closesrv.py.
 fetch('coins/index.json',{credentials:'same-origin'}).then(r=>r.json()).then(a=>{ICONS=new Set(a);if(S)render()}).catch(()=>{});
 const ci=(c,sz)=>{c=String(c||'?');const l=c.toLowerCase(),st=sz?` style="--s:${sz}px"`:'',fb=`<span class="ci lt"${st}>${esc(c.slice(0,1))}</span>`;
  // local pack first; else CoinMarketCap via markets data (covers new listings like ASTER until we ship a local file); else letter
@@ -107,7 +108,10 @@ function renderPositions(){
  if(box.dataset.k!==keys){box.dataset.k=keys;charts={};
   box.innerHTML=S.positions.map(p=>`<article class="pos" data-sym="${esc(p.symbol)}"><div class="pos-h"></div>
    <div class="seg sm tfseg"><span class="sb"></span><button class="press ${tf[p.symbol]!=='1m'?'on':''}" data-tf="5m">5m</button><button class="press ${tf[p.symbol]==='1m'?'on':''}" data-tf="1m">1m</button></div>
-   <div class="pchart"><canvas></canvas></div><div class="pos-b"></div><div class="sellrow"><button class="sellb press" data-sell="${esc(p.symbol)}">Sell</button></div></article>`).join('');
+   <div class="pchart"><canvas></canvas></div><div class="pos-b"></div><div class="sellrow">
+   <div class="actg"><button class="actb press" data-edit="${esc(p.symbol)}"${ENABLE_MODIFY_PARTIAL?'':' disabled aria-disabled="true"'}>Edit TP/SL</button>${ENABLE_MODIFY_PARTIAL?'':'<span class="soon">Coming soon</span>'}</div>
+   <div class="actg"><button class="actb press" data-partial="${esc(p.symbol)}"${ENABLE_MODIFY_PARTIAL?'':' disabled aria-disabled="true"'}>Partial TP</button>${ENABLE_MODIFY_PARTIAL?'':'<span class="soon">Coming soon</span>'}</div>
+   <button class="sellb press" data-sell="${esc(p.symbol)}">Sell</button></div></article>`).join('');
   box.querySelectorAll('.pos').forEach(el=>{const sym=el.dataset.sym;charts[sym]=PosChart(el.querySelector('canvas'));segInit(el.querySelector('.seg'),b=>{tf[sym]=b.dataset.tf;drawCharts()})})}
  S.positions.forEach(p=>{const el=box.querySelector(`.pos[data-sym="${p.symbol}"]`);if(!el)return;const h=posInfo(p);el.querySelector('.pos-h').innerHTML=h.head;el.querySelector('.pos-b').innerHTML=h.body});
  drawCharts()}
@@ -564,8 +568,128 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
      if(queued&&q.status==='pending')st.textContent='Box received it. Waiting for Crypto Trader…'}catch(_){}}
    st.innerHTML=queued?'<b class="warn">Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.</b>':'<b class="warn">No response yet, Crypto Trader may be offline.</b>';ok.textContent='No response'}
   catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was closed. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
+
+/* ---------- v23: Edit TP/SL + Partial TP (feature-flagged; send path mirrors Sell, never omits type on these requests) ---------- */
+function rawpx(v){if(v==null||v==='')return '';const a=Math.abs(v),d=a>=1000?1:a>=10?2:a>=1?3:a>=0.1?5:8;return String(Number(Number(v).toFixed(d)))}
+function liveMark(p){const L=LIVE[p.symbol];return(L&&L.mark&&Date.now()-L.t<20000)?L.mark:p.mark}
+function parseLvl(s){if(s==null)return null;const t=String(s).trim();if(!t)return null;const n=Number(t.replace(/,/g,''));return Number.isFinite(n)&&n>0?n:NaN}
+function tpslValid(p,stop,tgt,mark){const lo=p.side==='long';if(stop==null||tgt==null||!mark)return{ok:false,msg:'Enter both a stop and a take profit'};if(!Number.isFinite(stop)||!Number.isFinite(tgt))return{ok:false,msg:'Enter a valid price'};
+ if(lo){if(!(stop<mark&&mark<tgt))return{ok:false,msg:'For a long, stop must be below the mark and take profit above it'}}
+ else{if(!(tgt<mark&&mark<stop))return{ok:false,msg:'For a short, take profit must be below the mark and stop above it'}}
+ return{ok:true,msg:''}}
+function previewHTML(p,stop,tgt,mark){const sg=p.side==='long'?1:-1,sz=p.size||0;
+ const toS=(stop&&mark)?(stop-mark)*sz*sg:null,toT=(tgt&&mark)?(tgt-mark)*sz*sg:null;
+ const pcS=(stop&&mark)?(stop/mark-1)*100:null,pcT=(tgt&&mark)?(tgt/mark-1)*100:null;
+ return `<div class="tpsl-prev"><div><span class="k">To stop</span><b class="dn">${pct(pcS)}</b><span class="mut">${toS==null?'—':usd(toS,1)+' at risk'}</span></div>
+  <div><span class="k">To target</span><b class="up">${pct(pcT)}</b><span class="mut">${toT==null?'—':usd(toT,1)+' reward'}</span></div></div>`}
+function tpslChart(cv,p,getV,setV){
+ let drag=null;
+ const draw=()=>{const v=getV(),dpr=Math.max(1,window.devicePixelRatio||1),cssW=cv.clientWidth||320,cssH=cv.clientHeight||160;
+  cv.width=Math.round(cssW*dpr);cv.height=Math.round(cssH*dpr);const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,cssW,cssH);
+  const levels=[{k:'entry',px:p.entry,c:'#e7e9ea',lab:'ENTRY',drag:false},{k:'mark',px:v.mark,c:'#1d9bf0',lab:'MARK',drag:false},{k:'stop',px:v.stop,c:'#f91880',lab:'STOP',drag:true},{k:'target',px:v.target,c:'#00ba7c',lab:'TARGET',drag:true}].filter(x=>Number.isFinite(x.px));
+  const xs=levels.map(x=>x.px);const pad=Math.max((Math.max(...xs)-Math.min(...xs))*0.18, (v.mark||p.entry||1)*0.008);
+  let mn=Math.min(...xs)-pad,mx=Math.max(...xs)+pad;if(mx<=mn){mn-=1;mx+=1}
+  const L=10,R=cssW-56,T=12,B=cssH-12,Y=pr=>T+(1-(pr-mn)/(mx-mn))*(B-T);
+  const bars=((posData[p.symbol]||{}).tf||{})['5m']||((posData[p.symbol]||{}).tf||{})['1m']||[];
+  if(bars.length>2){const n=bars.slice(-60),w=(R-L)/Math.max(1,n.length-1);g.beginPath();n.forEach((c,i)=>{const y=Y(c[4]??c.close??c[1]);g[i?'lineTo':'moveTo'](L+i*w,y)});g.strokeStyle='rgba(255,255,255,.22)';g.lineWidth=1.2;g.stroke()}
+  levels.forEach(x=>{const y=Y(x.px);g.beginPath();g.moveTo(L,y);g.lineTo(R,y);g.strokeStyle=x.c;g.lineWidth=x.drag?2:1;g.setLineDash(x.drag?[]:[4,4]);g.stroke();g.setLineDash([]);
+   g.fillStyle=x.c;g.font='700 10px ui-monospace,monospace';g.textBaseline='middle';g.fillText(x.lab+' '+rawpx(x.px),R+4,y);
+   if(x.drag){g.beginPath();g.arc(L+8,y,5,0,Math.PI*2);g.fill()}})}
+ const hit=y=>{const v=getV(),dpr=Math.max(1,window.devicePixelRatio||1),cssH=cv.clientHeight||160,cssW=cv.clientWidth||320;
+  const xs=[v.stop,v.target,v.mark,p.entry].filter(Number.isFinite);const pad=Math.max((Math.max(...xs)-Math.min(...xs))*0.18,(v.mark||p.entry||1)*0.008);
+  let mn=Math.min(...xs)-pad,mx=Math.max(...xs)+pad;if(mx<=mn){mn-=1;mx+=1}
+  const T=12,B=cssH-12,price=mn+(1-(y-T)/(B-T))*(mx-mn);
+  const Y=pr=>T+(1-(pr-mn)/(mx-mn))*(B-T);const cand=[['stop',v.stop],['target',v.target]].filter(x=>Number.isFinite(x[1]));
+  let best=null,bd=1e9;cand.forEach(([k,pr])=>{const d=Math.abs(Y(pr)-y);if(d<bd){bd=d;best=k}});return{which:bd<=16?best:null,price}}
+ cv.onpointerdown=e=>{const r=cv.getBoundingClientRect(),h=hit(e.clientY-r.top);if(!h.which)return;cv.setPointerCapture(e.pointerId);drag=h.which;cv.classList.add('dragging')};
+ cv.onpointermove=e=>{if(!drag)return;const r=cv.getBoundingClientRect(),h=hit(e.clientY-r.top);if(Number.isFinite(h.price))setV(drag,h.price)};
+ const end=()=>{drag=null;cv.classList.remove('dragging')};cv.onpointerup=end;cv.onpointercancel=end;
+ draw();return draw}
+
+async function sendTyped(p, extra, st, okBtn){
+  const id=uuid4();let j=null,queued=false,lastErr='';
+  const pl=JSON.stringify(Object.assign({pair:p.symbol,side:p.side,entry_price:p.entry,ts:Date.now()/1000,nonce:crypto.getRandomValues(new Uint32Array(2)).join('-'),id},extra));
+  const body=JSON.stringify({p:pl,s:await hsig(pl)});
+  for(let a=1;a<=4&&!j;a++){
+   try{const r=await tfetch(boxURL()+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body},9000);const x=await r.json();
+    if(r.ok&&x.id){j=x;break}if(r.status>=400&&r.status<500)throw Object.assign(new Error(x.error||('HTTP '+r.status)),{fatal:true});lastErr='HTTP '+r.status}
+   catch(e){if(e.fatal)throw e;lastErr=e.name==='AbortError'?'timed out':'no connection'}
+   if(a<4){st.textContent=`Box not answering (${lastErr}), retrying ${a+1}/4…`;await new Promise(x=>setTimeout(x,2000*a))}}
+  if(!j){const r=await tfetch('https://ntfy.sh/ctq'+(await hsig('ct-close-q')).slice(0,32),{method:'POST',body:await aesEnc(JSON.parse(body))},10000);
+   if(!r.ok)throw new Error('box unreachable and backup queue failed (HTTP '+r.status+')');queued=true;j={id}}
+  return {j,queued,id}
+}
+async function waitResult(j,queued,st,okBtn,d,fmt){
+  st.textContent=queued?'Box unreachable, sent via backup queue. Waiting for Crypto Trader (request valid 10 min)…':'Sent. Waiting for Crypto Trader…';okBtn.textContent='Pending…';
+  const t0=Date.now(),lim=queued?600000:60000;while(Date.now()-t0<lim){await new Promise(x=>setTimeout(x,2500));if(!d.isConnected)return;
+   try{const q=await (await tfetch(boxURL()+'/close/'+j.id,{},8000)).json();
+    if(q.status==='applied'||q.status==='closed'){const msg=fmt(q);st.innerHTML=`<b class="up">${msg}</b>`;okBtn.textContent='Done';toast(msg.replace(/<[^>]+>/g,' '));return}
+    if(q.status==='rejected'){const msg='Rejected: '+(q.reason||'no reason given');st.innerHTML=`<b class="dn">${esc(msg)}</b>`;okBtn.textContent='Rejected';toast(msg);return}
+    if(queued&&q.status==='pending')st.textContent='Box received it. Waiting for Crypto Trader…'}catch(_){}}
+  const warn=queued?'Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.':'No response yet, Crypto Trader may be offline.';
+  st.innerHTML=`<b class="warn">${warn}</b>`;okBtn.textContent='No response';toast(warn)
+}
+
+function modifyDlg(p){const d=document.createElement('div');d.className='sheet sellsh tpslsh';
+ const mark0=liveMark(p);
+ d.innerHTML=`<div class="sh-card tpsl-card"><b>Edit take profit / stop</b>
+  <p>${esc(p.symbol)} <span class="${p.side==='long'?'up':'dn'}">${esc(p.side)}</span> · mark <span id="tpslmk">${px(mark0)}</span> · entry ${px(p.entry)}</p>
+  <canvas class="tpsl-cv" id="tpslcv" height="160"></canvas>
+  <label class="tpsl-in">Take profit<input id="tpin" type="text" inputmode="decimal" autocomplete="off" value="${esc(rawpx(p.target))}"></label>
+  <label class="tpsl-in">Stop loss<input id="slin" type="text" inputmode="decimal" autocomplete="off" value="${esc(rawpx(p.stop))}"></label>
+  <div id="tpslprev"></div><p class="err" id="tpslerr"></p><p class="sellst" id="editst"></p>
+  <div class="sellbtns"><button class="pill ghost press" id="editno">Cancel</button><button class="pill tpslgo press" id="editok">Update</button></div></div>`;
+ document.body.appendChild(d);
+ const st=d.querySelector('#editst'),ok=d.querySelector('#editok'),no=d.querySelector('#editno'),tin=d.querySelector('#tpin'),sin=d.querySelector('#slin'),err=d.querySelector('#tpslerr'),prev=d.querySelector('#tpslprev'),mk=d.querySelector('#tpslmk');
+ let busy=false,draw=null;
+ const near=(a,b)=>a==null||b==null?a==b:Math.abs(a-b)<=Math.max(1e-8,Math.abs(b)*1e-8);
+ const cur=()=>{const mark=liveMark(p);return{stop:parseLvl(sin.value),target:parseLvl(tin.value),mark}};
+ const paint=()=>{const v=cur(),effS=Number.isFinite(v.stop)?v.stop:p.stop,effT=Number.isFinite(v.target)?v.target:p.target;
+  if(mk)mk.textContent=px(v.mark);prev.innerHTML=previewHTML(p,effS,effT,v.mark);
+  const chS=v.stop!=null&&Number.isFinite(v.stop)&&!near(v.stop,p.stop),chT=v.target!=null&&Number.isFinite(v.target)&&!near(v.target,p.target);
+  const val=tpslValid(p,effS,effT,v.mark);err.textContent=val.ok?'':val.msg;ok.disabled=busy||!val.ok||!(chS||chT);
+  if(draw)draw()};
+ const setV=(k,price)=>{if(k==='stop')sin.value=rawpx(price);else tin.value=rawpx(price);paint()};
+ draw=tpslChart(d.querySelector('#tpslcv'),p,()=>{const v=cur();return{stop:Number.isFinite(v.stop)?v.stop:p.stop,target:Number.isFinite(v.target)?v.target:p.target,mark:v.mark}},setV);
+ tin.addEventListener('input',paint);sin.addEventListener('input',paint);paint();
+ const tick=setInterval(paint,1000);
+ const close=()=>{clearInterval(tick);d.remove()};
+ no.onclick=()=>close();d.addEventListener('click',e=>{if(e.target===d&&!busy)close()});
+ const esc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',esc)}};addEventListener('keydown',esc);
+ ok.onclick=async()=>{if(busy||ok.disabled)return;const v=cur(),effS=Number.isFinite(v.stop)?v.stop:p.stop,effT=Number.isFinite(v.target)?v.target:p.target;
+  const val=tpslValid(p,effS,effT,v.mark);if(!val.ok){err.textContent=val.msg;return}
+  busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
+  const stop=v.stop==null||near(v.stop,p.stop)?null:v.stop,target=v.target==null||near(v.target,p.target)?null:v.target;
+  try{const {j,queued}=await sendTyped(p,{type:'modify',stop,target},st,ok);await waitResult(j,queued,st,ok,d,q=>{
+    const ns=q.stop??effS,nt=q.target??effT;return `Updated stop ${px(ns)} · target ${px(nt)}`})}
+   catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was changed. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false;toast("Couldn't send: "+(e.message||e))}}}
+
+function partialDlg(p){const d=document.createElement('div');d.className='sheet sellsh partsh';
+ const mark0=liveMark(p),sg=p.side==='long'?1:-1,fracs=[0.25,0.5,0.75];
+ const row=f=>{const sz=(p.size||0)*f,pnl=(mark0-p.entry)*sz*sg;return `<button type="button" class="fracb press" data-frac="${f}"><b>${Math.round(f*100)}%</b><span>${qty(sz)} ${esc(p.coin)}</span><span class="${cls(pnl)}">${usd(pnl,1)} est.</span></button>`};
+ d.innerHTML=`<div class="sh-card tpsl-card"><b>Partial take profit</b>
+  <p>Sell a slice of ${esc(p.symbol)} <span class="${p.side==='long'?'up':'dn'}">${esc(p.side)}</span> at market.<br><span class="mut">Size ${qty(p.size)} · mark ${px(mark0)} · entry ${px(p.entry)}</span></p>
+  <div class="fracs" id="fracs">${fracs.map(row).join('')}</div>
+  <p class="partcf" id="partcf" hidden></p>
+  <p class="sellst" id="partst"></p>
+  <div class="sellbtns"><button class="pill ghost press" id="partno">Cancel</button><button class="pill tpslgo press" id="partok" disabled>Confirm</button></div></div>`;
+ document.body.appendChild(d);
+ const st=d.querySelector('#partst'),ok=d.querySelector('#partok'),no=d.querySelector('#partno'),cf=d.querySelector('#partcf');
+ let busy=false,frac=null;
+ const pick=f=>{frac=f;d.querySelectorAll('.fracb').forEach(b=>b.classList.toggle('on',Number(b.dataset.frac)===f));
+  const mark=liveMark(p),sz=(p.size||0)*f,pnl=(mark-p.entry)*sz*sg;
+  cf.hidden=false;cf.innerHTML=`Sell <b>${Math.round(f*100)}%</b> (${qty(sz)} ${esc(p.coin)}) of ${esc(p.symbol)} at market? Est. P&amp;L <b class="${cls(pnl)}">${usd(pnl,1)}</b>`;
+  if(!busy){ok.disabled=false;ok.textContent='Confirm '+Math.round(f*100)+'%'}};
+ d.querySelector('#fracs').addEventListener('click',e=>{const b=e.target.closest('[data-frac]');if(b&&!busy)pick(Number(b.dataset.frac))});
+ const close=()=>d.remove();no.onclick=()=>close();d.addEventListener('click',e=>{if(e.target===d&&!busy)close()});
+ const esc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',esc)}};addEventListener('keydown',esc);
+ ok.onclick=async()=>{if(busy||frac==null)return;busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
+  try{const {j,queued}=await sendTyped(p,{type:'partial',fraction:frac},st,ok);const f=frac;await waitResult(j,queued,st,ok,d,q=>{
+    const px_=q.exit_price!=null?px(q.exit_price):px(liveMark(p));const pnl=q.pnl!=null?usd(q.pnl,1):'';return `Sold ${Math.round(f*100)}% at $${px_}${pnl?`, P&amp;L <span class="${cls(q.pnl)}">${pnl}</span>`:''}`})}
+   catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was sold. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false;toast("Couldn't send: "+(e.message||e))}}}
+
 (()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
-$('#positions').addEventListener('click',e=>{const b=e.target.closest('[data-sell]');if(!b)return;e.stopPropagation();const p=S&&S.positions.find(x=>x.symbol===b.dataset.sell);if(p)sellDlg(p)});
+$('#positions').addEventListener('click',e=>{if(e.target.closest('.sellrow'))e.stopPropagation();const b=e.target.closest('[data-sell]'),ed=e.target.closest('[data-edit]'),pt=e.target.closest('[data-partial]');if(!b&&!ed&&!pt)return;const sym=(b&&b.dataset.sell)||(ed&&ed.dataset.edit)||(pt&&pt.dataset.partial);const p=S&&S.positions.find(x=>x.symbol===sym);if(!p)return;if(b)sellDlg(p);else if(ENABLE_MODIFY_PARTIAL&&ed)modifyDlg(p);else if(ENABLE_MODIFY_PARTIAL&&pt)partialDlg(p)});
 /* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
 (()=>{if(RM)return;const seen=new WeakSet(),prev=new Map(),busy=new WeakSet();
  const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.hv,.pos b,.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
@@ -668,5 +792,5 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
 window.__x15=X15;document.addEventListener('click',e=>{if(e.target.closest('.tb,[data-goto]'))setTimeout(()=>{const T=$('#term');if(T&&T.offsetParent)T.scrollTop=T.scrollHeight},60)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
-window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK}};// read-only test/debug hook
+window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK},get ENABLE_MODIFY_PARTIAL(){return ENABLE_MODIFY_PARTIAL},modifyDlg,partialDlg};// read-only test/debug hook
 })();
