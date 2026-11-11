@@ -7,6 +7,7 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS=['home','trades','markets','activity','stats'];
 let S=null, tab='home', filt='all', failed=0, tf={}, charts={}, posData={}, ICONS=new Set();
 const ENABLE_MODIFY_PARTIAL=true; // v24: on — Crypto Trader poller handles type=modify/partial. Keep in sync with ENABLE_MODIFY_PARTIAL in gh/closesrv.py.
+const ENABLE_PARTIAL_EDIT=true; // v26: on — Crypto Trader poller has handled type=partial_edit since 16:57 GMT. Keep in sync with ENABLE_PARTIAL_EDIT in gh/closesrv.py.
 fetch('coins/index.json',{credentials:'same-origin'}).then(r=>r.json()).then(a=>{ICONS=new Set(a);if(S)render()}).catch(()=>{});
 const ci=(c,sz)=>{c=String(c||'?');const l=c.toLowerCase(),st=sz?` style="--s:${sz}px"`:'',fb=`<span class="ci lt"${st}>${esc(c.slice(0,1))}</span>`;
  // local pack first; else CoinMarketCap via markets data (covers new listings like ASTER until we ship a local file); else letter
@@ -19,6 +20,8 @@ const pct=v=>v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2)+'%';
 const px=v=>{if(v==null)return '—';const a=Math.abs(v);const d=a>=1000?1:a>=10?2:a>=1?3:a>=0.1?5:6;return v.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d})};
 const qty=v=>v==null?'—':v.toLocaleString('en-GB',{maximumFractionDigits:4});
 const qtyS=v=>v==null?'—':Number(v).toLocaleString('en-GB',{maximumFractionDigits:Math.abs(v)>=100?0:Math.abs(v)>=10?1:4});
+const hasRestingPartial=p=>{if(!p)return false;if(p.partial_status!=null&&String(p.partial_status).length)return p.partial_status==='resting';return !!(p.partial_placed&&!p.partial_filled&&!p.partial_removed_by_app)};
+const hasFilledPartial=p=>{if(!p)return false;if(p.partial_status!=null&&String(p.partial_status).length)return p.partial_status==='filled';return !!(p.partial_filled&&!p.partial_removed_by_app)};
 const cls=v=>v>0?'up':v<0?'dn':'mut';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pd=t=>t?new Date(String(t).replace(' GMT','Z').replace(' UTC','Z').replace(' BST','+01:00').replace(/^(\d{4}-\d\d-\d\d) /,'$1T').replace(/(\.\d{3})\d+/,'$1')):null;
@@ -112,12 +115,13 @@ function renderPositions(){
    <div class="pchart"><canvas></canvas></div><div class="pos-b"></div><div class="sellrow">
    <div class="actg"><button class="actb press" data-edit="${esc(p.symbol)}">Edit TP/SL</button></div>
    <div class="actg"><button class="actb press" data-partial="${esc(p.symbol)}">Partial TP</button></div>
+   <div class="actg"><button class="actb press" data-pedit="${esc(p.symbol)}"${ENABLE_PARTIAL_EDIT?'':' disabled aria-disabled="true"'}>Edit partial TP</button>${ENABLE_PARTIAL_EDIT?'':'<span class="soon">Coming soon</span>'}</div>
    <button class="sellb press" data-sell="${esc(p.symbol)}">Sell</button></div></article>`).join('');
   box.querySelectorAll('.pos').forEach(el=>{const sym=el.dataset.sym;charts[sym]=PosChart(el.querySelector('canvas'));segInit(el.querySelector('.seg'),b=>{tf[sym]=b.dataset.tf;drawCharts()})})}
  S.positions.forEach(p=>{const el=box.querySelector(`.pos[data-sym="${p.symbol}"]`);if(!el)return;const h=posInfo(p);el.querySelector('.pos-h').innerHTML=h.head;el.querySelector('.pos-b').innerHTML=h.body});
  drawCharts()}
 function drawCharts(){if(!S)return;S.positions.forEach(p=>{const f=charts[p.symbol];if(!f)return;const one=tf[p.symbol]==='1m';
- const pdx=posData[p.symbol]||{};f({candles:(pdx.tf||{})[one?'1m':'5m']||[],res:one?60:300,mark:p.mark,entry:p.entry,stop:p.stop,target:p.target,opened:p.opened,partials:p.partials})})}
+ const pdx=posData[p.symbol]||{};f({candles:(pdx.tf||{})[one?'1m':'5m']||[],res:one?60:300,mark:p.mark,entry:p.entry,stop:p.stop,target:p.target,opened:p.opened,partials:p.partials,partial_price:p.partial_price,partial_size:p.partial_size,partial_filled:p.partial_filled,partial_status:p.partial_status,partial_placed:p.partial_placed,partial_removed_by_app:p.partial_removed_by_app,partial_fill_price:p.partial_fill_price,partial_filled_size:p.partial_filled_size})})}
 function renderFeed(){const ft=S.trades.filter(t=>filt==='all'||(filt==='win'?(t.pnl||0)>0:(t.pnl||0)<=0));$('#feed').innerHTML=ft.map(tradeHTML).join('')||'<div class="empty">Nothing here.</div>'}
 function chart(pts,start){
  const svg=$('#chart');if(!pts.length){svg.innerHTML='';return}
@@ -344,7 +348,7 @@ async function renderTrade(id){
   line(s,d.entry,'ENTRY','#e7e9ea',2);line(s,d.exit,'EXIT','#1d9bf0',0);line(s,d.stop_at_entry,d.stop_moved?'STOP (moved)':'STOP','#f91880',2);line(s,d.target_at_entry,'TARGET','#00ba7c',2);
   const res=RESS[d.res]||300,mk=[];const et=tsec(d.entry_time),xt=tsec(d.exit_time);
   if(et)mk.push({time:snap(et,res),position:lo?'belowBar':'aboveBar',color:'#a78bfa',shape:lo?'arrowUp':'arrowDown',text:'IN '+px(d.entry)});
-  (d.linked_exits||[]).forEach(f=>{const ft=tsec(f.time);if(ft)mk.push({time:snap(ft,res),position:lo?'aboveBar':'belowBar',color:'#38bdf8',shape:'circle',text:'Partial sold '+qtyS(f.size)+(f.price?' @ '+px(f.price):'')})});
+  (d.linked_exits||[]).forEach(f=>{const ft=tsec(f.time);if(ft)mk.push({time:snap(ft,res),position:lo?'aboveBar':'belowBar',color:'#c084fc',shape:'circle',text:'Partial sold '+qtyS(f.size)+(f.price?' @ '+px(f.price):'')})});
   if(xt)mk.push({time:snap(xt,res),position:lo?'aboveBar':'belowBar',color:(d.pnl||0)>0?'#00ba7c':'#f91880',shape:lo?'arrowDown':'arrowUp',text:'OUT '+px(d.exit)});
   mk.sort((a,b)=>a.time-b.time);s.setMarkers(mk);c.timeScale().fitContent();V.cleanup=()=>c.remove()}
  else if(d.candles)$('#tchart').innerHTML='<div class="ld">No chart data for this window.</div>';
@@ -385,14 +389,14 @@ function renderPosView(arg){
  let tfv=tf[sym+'_v']||'5m';
  vbody.innerHTML=`<div id="phero"></div><div class="tfrow"><div class="seg sm" id="vtf"><span class="sb"></span>${['1m','5m','15m','1h'].map(x=>`<button class="press ${x===tfv?'on':''}" data-tf="${x}">${x}</button>`).join('')}</div><span class="mut" style="font-size:13px" id="vtick"></span></div>
  <div class="lwbox" id="pchart"><div class="ld">Loading chart…</div></div>
- <div class="legend"><span><i style="color:#e7e9ea"></i>Entry</span><span><i style="color:#f91880"></i>Stop</span><span><i style="color:#00ba7c"></i>Target</span><span><i class="legdot" style="background:#38bdf8"></i>Partial sold</span><span>Pinch / drag to zoom & pan</span></div><div class="srcnote">Candles: Kraken spot ${esc(spotPair(p.coin).replace('USD','/USD'))} · price, P&amp;L: Kraken Futures mark, live in your browser</div><div id="pdet"></div>`;
+ <div class="legend"><span><i style="color:#e7e9ea"></i>Entry</span><span><i style="color:#f91880"></i>Stop</span><span><i style="color:#00ba7c"></i>Target</span><span><i style="color:#ffb020"></i>Partial TP</span><span><i class="legdot" style="background:#c084fc"></i>Partial sold</span><span>Pinch / drag to zoom & pan</span></div><div class="srcnote">Candles: Kraken spot ${esc(spotPair(p.coin).replace('USD','/USD'))} · price, P&amp;L: Kraken Futures mark, live in your browser</div><div id="pdet"></div>`;
  let ch=null,lines=[],lastBar=null,res=RESS[tfv],live=null;
  function build(){const d=posData[sym];const bars=d&&d.tf&&d.tf[tfv];if(!bars||!bars.length)return;
-  if(!ch){const el=$('#pchart');el.innerHTML='';ch=mkChart(el,p.entry,()=>[p.entry,p.stop,p.target])}
+  if(!ch){const el=$('#pchart');el.innerHTML='';ch=mkChart(el,p.entry,()=>[p.entry,p.stop,p.target,hasRestingPartial(p)?p.partial_price:null])}
   const b=toBars(bars);ch.s.setData(b);lastBar=Object.assign({},b[b.length-1]);res=RESS[tfv];setLines();setMarks();ch.c.timeScale().scrollToRealTime()}
- function setLines(){lines.forEach(l=>ch.s.removePriceLine(l));lines=[line(ch.s,p.entry,'ENTRY','#e7e9ea',2),line(ch.s,p.stop,'STOP','#f91880',2),line(ch.s,p.target,'TARGET','#00ba7c',2)].filter(Boolean)}
+ function setLines(){lines.forEach(l=>ch.s.removePriceLine(l));lines=[line(ch.s,p.entry,'ENTRY','#e7e9ea',2),line(ch.s,p.stop,'STOP','#f91880',2),line(ch.s,p.target,'TARGET','#00ba7c',2),hasRestingPartial(p)?line(ch.s,p.partial_price,'PARTIAL TP '+px(p.partial_price),'#ffb020',2):null].filter(Boolean)}
  function setMarks(){const lo=p.side==='long',mk=[];const ot=tsec(p.opened);if(ot)mk.push({time:snap(ot,res),position:lo?'belowBar':'aboveBar',color:'#a78bfa',shape:lo?'arrowUp':'arrowDown',text:'IN '+px(p.entry)});
-  (p.partials||[]).forEach(f=>{const t=tsec(f.time);if(t)mk.push({time:snap(t,res),position:lo?'aboveBar':'belowBar',color:'#38bdf8',shape:'circle',text:'Partial sold '+qtyS(f.size)+' @ '+px(f.price)})});
+  const sold=(p.partials||[]).slice();if(hasFilledPartial(p)&&p.partial_fill_price!=null&&!sold.some(f=>f.price!=null&&Math.abs(+f.price-+p.partial_fill_price)<1e-8))sold.push({price:p.partial_fill_price,size:p.partial_filled_size,time:null});sold.forEach(f=>{const t=tsec(f.time)||(lastBar&&lastBar.time);if(t)mk.push({time:snap(t,res),position:lo?'aboveBar':'belowBar',color:'#c084fc',shape:'circle',text:'Partial sold '+(f.size!=null?qtyS(f.size)+' @ ':'@ ')+px(f.price)})});
   const first=ch.s.data()[0];ch.s.setMarkers(mk.filter(m=>!first||m.time>=first.time).sort((a,b)=>a.time-b.time))}
  function tickBar(mark){if(!ch||!lastBar||!mark)return;const now=Math.floor(Date.now()/1000),bt=snap(now,res);
   if(bt>lastBar.time)lastBar={time:bt,open:lastBar.close,high:mark,low:mark,close:mark};else{lastBar.close=mark;lastBar.high=Math.max(lastBar.high,mark);lastBar.low=Math.min(lastBar.low,mark)}
@@ -654,6 +658,8 @@ function applyPosLevels(sym,q){
   const pos=S&&S.positions.find(x=>x.symbol===sym);if(!pos)return pos;
   if(q.stop!=null)pos.stop=q.stop;if(q.target!=null)pos.target=q.target;
   if(q.remaining_size!=null)pos.size=q.remaining_size;
+  if(q.removed){pos.partial_status='removed';pos.partial_removed_by_app=true;pos.partial_placed=false;pos.partial_filled=false;pos.partial_order_id=null;if(q.partial_price!=null)pos.partial_price=q.partial_price;if(q.partial_size!=null)pos.partial_size=q.partial_size}
+  else{if(q.partial_price!=null)pos.partial_price=q.partial_price;if(q.partial_size!=null)pos.partial_size=q.partial_size;if('partial_order_id' in q)pos.partial_order_id=q.partial_order_id;pos.partial_status='resting';pos.partial_placed=true;pos.partial_filled=false;pos.partial_removed_by_app=false}
   renderPositions();
   if(typeof V!=='undefined'&&V&&V.sym===sym&&V.applyLevels)V.applyLevels();
   return pos;
@@ -741,7 +747,44 @@ function partialDlg(p){const d=document.createElement('div');d.className='sheet 
    catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was sold. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false;toast("Couldn't send: "+(e.message||e))}}}
 
 (()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
-$('#positions').addEventListener('click',e=>{if(e.target.closest('.sellrow'))e.stopPropagation();const b=e.target.closest('[data-sell]'),ed=e.target.closest('[data-edit]'),pt=e.target.closest('[data-partial]');if(!b&&!ed&&!pt)return;const sym=(b&&b.dataset.sell)||(ed&&ed.dataset.edit)||(pt&&pt.dataset.partial);const p=S&&S.positions.find(x=>x.symbol===sym);if(!p)return;if(b)sellDlg(p);else if(ENABLE_MODIFY_PARTIAL&&ed)modifyDlg(p);else if(ENABLE_MODIFY_PARTIAL&&pt)partialDlg(p)});
+
+function peditDlg(p){const d=document.createElement('div');d.className='sheet sellsh peditsh';
+ const mark0=liveMark(p),has=hasRestingPartial(p);
+ d.innerHTML=`<div class="sh-card tpsl-card"><b>Edit partial TP</b>
+  <p>${esc(p.symbol)} <span class="${p.side==='long'?'up':'dn'}">${esc(p.side)}</span> · mark ${px(mark0)} · size ${qty(p.size)}${has?`<br><span class="mut">Resting partial ${qty(p.partial_size)} @ ${px(p.partial_price)}</span>`:''}</p>
+  <label class="tpsl-in">Partial TP price<input id="ppin" type="text" inputmode="decimal" autocomplete="off" value="${esc(rawpx(has?p.partial_price:''))}"></label>
+  <label class="tpsl-in">Size<input id="psin" type="text" inputmode="decimal" autocomplete="off" value="${esc(rawpx(has&&p.partial_size!=null?p.partial_size:''))}"></label>
+  <p class="err" id="pederr"></p><p class="sellst" id="pedst"></p>
+  <div class="sellbtns"><button class="pill ghost press" id="pedno">Cancel</button><button class="pill tpslgo press" id="pedok">Save</button></div>
+  <button class="pill danger press" id="pedrm" ${has?'':'hidden'}>Remove partial</button></div>`;
+ document.body.appendChild(d);
+ const st=d.querySelector('#pedst'),ok=d.querySelector('#pedok'),no=d.querySelector('#pedno'),rm=d.querySelector('#pedrm'),err=d.querySelector('#pederr'),pin=d.querySelector('#ppin'),sin=d.querySelector('#psin');
+ let busy=false,rmStep=false;
+ const near=(a,b)=>a==null||b==null?a==b:rawpx(a)===rawpx(b);
+ const cur=()=>({price:parseLvl(pin.value),size:parseLvl(sin.value),mark:liveMark(p)});
+ const valid=()=>{const v=cur();if(!Number.isFinite(v.price)||!Number.isFinite(v.size))return{ok:false,msg:'Enter a price and a size'};
+  if(!(v.size>0))return{ok:false,msg:'Size must be greater than 0'};
+  if(v.size>(p.size||0)+1e-12)return{ok:false,msg:'Size cannot exceed the open position'};
+  const lo=p.side==='long';if(lo&&!(v.price>v.mark))return{ok:false,msg:'For a long, partial TP must be above the mark'};
+  if(!lo&&!(v.price<v.mark))return{ok:false,msg:'For a short, partial TP must be below the mark'};
+  return{ok:true,msg:''}};
+ const paint=()=>{const v=valid();err.textContent=v.ok?'':v.msg;const chP=(()=>{const c=cur();const sameP=has&&near(c.price,p.partial_price),sameS=has&&near(c.size,p.partial_size);return !(sameP&&sameS)})();ok.disabled=busy||!v.ok||!chP};
+ pin.addEventListener('input',paint);sin.addEventListener('input',paint);paint();
+ const close=()=>d.remove();no.onclick=()=>close();d.addEventListener('click',e=>{if(e.target===d&&!busy)close()});
+ const onEsc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',onEsc)}};addEventListener('keydown',onEsc);
+ ok.onclick=async()=>{if(busy||ok.disabled)return;const v=valid();if(!v.ok){err.textContent=v.msg;return}const c=cur();
+  busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';rm.disabled=true;
+  const price=has&&near(c.price,p.partial_price)?null:c.price,size=has&&near(c.size,p.partial_size)?null:c.size;
+  try{const {j,queued}=await sendTyped(p,{type:'partial_edit',partial_price:price,partial_size:size,remove:false},st,ok);
+   await waitResult(j,queued,st,ok,d,q=>{applyPosLevels(p.symbol,q);const np=q.partial_price??price??p.partial_price,ns=q.partial_size??size??p.partial_size;return `Partial TP set: ${qty(ns)} @ ${px(np)}`})}
+  catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was changed. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false;rm.disabled=false;toast("Couldn't send: "+(e.message||e))}};
+ rm.onclick=async()=>{if(busy)return;if(!hasRestingPartial(p)){st.innerHTML='<b class="dn">Rejected: there is no resting partial.</b>';return}if(!rmStep){rmStep=true;rm.textContent='Confirm remove';st.innerHTML='<b class="warn">Remove the resting partial TP? This cannot be undone from here.</b>';return}
+  busy=true;ok.disabled=true;rm.disabled=true;rm.textContent='Sending…';no.textContent='Close';
+  try{const {j,queued}=await sendTyped(p,{type:'partial_edit',partial_price:null,partial_size:null,remove:true},st,ok);
+   await waitResult(j,queued,st,ok,d,q=>{applyPosLevels(p.symbol,Object.assign({removed:true},q));return 'Resting partial TP removed'})}
+  catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was removed. Tap Retry.</b>`;rm.disabled=false;rm.textContent='Confirm remove';busy=false;ok.disabled=false;toast("Couldn't send: "+(e.message||e))}}}
+
+$('#positions').addEventListener('click',e=>{if(e.target.closest('.sellrow'))e.stopPropagation();const b=e.target.closest('[data-sell]'),ed=e.target.closest('[data-edit]'),pt=e.target.closest('[data-partial]'),pe=e.target.closest('[data-pedit]');if(!b&&!ed&&!pt&&!pe)return;const sym=(b&&b.dataset.sell)||(ed&&ed.dataset.edit)||(pt&&pt.dataset.partial)||(pe&&pe.dataset.pedit);const p=S&&S.positions.find(x=>x.symbol===sym);if(!p)return;if(b)sellDlg(p);else if(ENABLE_MODIFY_PARTIAL&&ed)modifyDlg(p);else if(ENABLE_MODIFY_PARTIAL&&pt)partialDlg(p);else if(ENABLE_PARTIAL_EDIT&&pe)peditDlg(p)});
 /* ---------- v11 motion: staggered entrances, price flash, count-up, chart draw-in (presentation only) ---------- */
 (()=>{if(RM)return;const seen=new WeakSet(),prev=new Map(),busy=new WeakSet();
  const ROWS='.pos,.tr,.lr,.mkr,.st,.kv,.mkg>div',NUMS='.hv,.pos b,.st .v,.mkp b,.foot2 b,.kvg b,.wtrack b';
@@ -844,5 +887,5 @@ const X15=(()=>{const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))?
 window.__x15=X15;document.addEventListener('click',e=>{if(e.target.closest('.tb,[data-goto]'))setTimeout(()=>{const T=$('#term');if(T&&T.offsetParent)T.scrollTop=T.scrollHeight},60)});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 window.__dock={bs,go,sizeBubble,slotX};
-window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK},get ENABLE_MODIFY_PARTIAL(){return ENABLE_MODIFY_PARTIAL},modifyDlg,partialDlg};// read-only test/debug hook
+window.__ct={get S(){return S},get BLOB(){return BLOB},LIVE,wsEnsure,applyLive,render,status,get wsOK(){return wsOK},get ENABLE_MODIFY_PARTIAL(){return ENABLE_MODIFY_PARTIAL},get ENABLE_PARTIAL_EDIT(){return ENABLE_PARTIAL_EDIT},modifyDlg,partialDlg,peditDlg};// read-only test/debug hook
 })();

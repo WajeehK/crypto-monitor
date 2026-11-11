@@ -1,8 +1,8 @@
 // Crypto Trader service worker (GitHub Pages build): app shell network-first with an offline copy, Web Push notifications.
 // Data (encrypted), Kraken prices and the Sell endpoint (POST, cross-origin) are never touched here: only same-origin GETs.
 // v20: restored (v15 accidentally emptied this file, which disabled push notifications and the offline copy).
-const SHELL='ct-shell-v25';
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(SHELL).then(c=>c.addAll(['./','index.html','app.css?v=25','app.js?v=25','chart.js?v=25','lwc.js','icon.svg','icon-192.png','coins/index.json']).catch(()=>{})))});
+const SHELL='ct-shell-v26';
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(SHELL).then(c=>c.addAll(['./','index.html','app.css?v=26','app.js?v=26','chart.js?v=26','lwc.js','icon.svg','icon-192.png','coins/index.json']).catch(()=>{})))});
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==SHELL)await caches.delete(k);await self.clients.claim()})()));
 self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET'||new URL(r.url).origin!==location.origin)return;
   e.respondWith(fetch(r,{cache:'no-cache'}).then(res=>{if(res.ok){const cp=res.clone();caches.open(SHELL).then(c=>c.put(r,cp))}return res})

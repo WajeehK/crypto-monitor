@@ -5,6 +5,8 @@ window.PosChart=function(canvas){
  function tagBox(x,y,text,bg,fg,W){ctx.font='600 11px JetBrains Mono, ui-monospace, monospace';const w=ctx.measureText(text).width+10;
   ctx.fillStyle=bg;const bx=Math.min(x,W-w-1);ctx.beginPath();ctx.roundRect?ctx.roundRect(bx,y-9,w,18,4):ctx.rect(bx,y-9,w,18);ctx.fill();
   ctx.fillStyle=fg;ctx.textBaseline='middle';ctx.fillText(text,bx+5,y+0.5);return w}
+ function isRestingPartial(d){if(!d)return false;if(d.partial_status!=null&&String(d.partial_status).length)return d.partial_status==='resting';return !!(d.partial_placed&&!d.partial_filled&&!d.partial_removed_by_app)}
+ function isFilledPartial(d){if(!d)return false;if(d.partial_status!=null&&String(d.partial_status).length)return d.partial_status==='filled';return !!(d.partial_filled&&!d.partial_removed_by_app)}
  return function draw(d){
   const dpr=Math.min(window.devicePixelRatio||1,3), W=canvas.clientWidth, H=canvas.clientHeight; if(!W||!H)return;
   if(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr)){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr)}
@@ -17,7 +19,7 @@ window.PosChart=function(canvas){
   const padR=78,padT=14,padB=22,cw=W-padR;
   const n=Math.max(30,Math.min(c.length,Math.floor(cw/7))); c=c.slice(-n);
   let lo=Math.min(...c.map(k=>k[3])),hi=Math.max(...c.map(k=>k[2]));
-  [d.entry,d.stop,d.target,d.mark].forEach(v=>{if(v){lo=Math.min(lo,v);hi=Math.max(hi,v)}});
+  [d.entry,d.stop,d.target,d.mark,(isRestingPartial(d)?d.partial_price:null),(isFilledPartial(d)?d.partial_fill_price:null)].forEach(v=>{if(v){lo=Math.min(lo,v);hi=Math.max(hi,v)}});
   const pad=(hi-lo)*0.08||hi*0.001; lo-=pad;hi+=pad;
   const Y=v=>padT+(1-(v-lo)/(hi-lo))*(H-padT-padB), step=cw/n, X=i=>i*step+step/2;
   const t0=c[0][0], XT=t=>X((t-t0)/res);
@@ -37,6 +39,7 @@ window.PosChart=function(canvas){
    const y1=Y(Math.max(k[1],k[4])),y2=Y(Math.min(k[1],k[4]));ctx.fillRect(x-bw/2,y1,bw,Math.max(1,y2-y1))});
   // level lines
   const lines=[[d.target,'TARGET','#00ba7c'],[d.entry,'ENTRY','#e7e9ea'],[d.stop,'STOP','#f91880']].filter(l=>l[0]);
+  if(isRestingPartial(d)&&d.partial_price)lines.push([d.partial_price,'PARTIAL TP '+fmt(d.partial_price),'#ffb020']);
   const tags=[];
   lines.forEach(([v,l,col])=>{const y=Math.round(Y(v))+.5;ctx.strokeStyle=col;ctx.globalAlpha=.85;ctx.setLineDash(l==='ENTRY'?[2,3]:[6,4]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cw,y);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
    tags.push({y,ty:y,text:fmt(v),bg:col,fg:l==='ENTRY'?'#000':'#fff',label:l})});
@@ -44,11 +47,14 @@ window.PosChart=function(canvas){
   // push overlapping tags apart (min 19px)
   tags.sort((a,b)=>a.y-b.y);for(let k=0;k<3;k++){for(let i=1;i<tags.length;i++){const g=tags[i].ty-tags[i-1].ty;if(g<19){const m=(19-g)/2;tags[i-1].ty-=m;tags[i].ty+=m}}}
   tags.forEach(t=>t.ty=Math.max(9,Math.min(H-padB+6,t.ty)));
-  // partial exits: a dot on the exit candle at the fill price, never a level line, never labelled TP
-  (d.partials||[]).forEach(p=>{const t=Date.parse(p.time.replace(/(\.\d{3})\d+/,'$1'))/1000;if(t<t0)return;const x=XT(t),y=Y(p.price);
-   const a=Math.abs(p.size),ds=a>=100?0:a>=10?1:4,sz=Number(p.size).toLocaleString('en-GB',{maximumFractionDigits:ds});
-   ctx.fillStyle='#38bdf8';ctx.strokeStyle='#041018';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,4.5,0,7);ctx.fill();ctx.stroke();
-   tagBox(x+8,y-14,'Partial sold '+sz+' @ '+fmt(p.price),'#38bdf8','#041018',cw)});
+  // partial exits: a dot on the exit candle at the fill price, never a level line, never labelled TP, never orange
+  const sold=(d.partials||[]).slice();
+  if(isFilledPartial(d)&&d.partial_fill_price){const fp=+d.partial_fill_price,fs=d.partial_filled_size;
+   if(!sold.some(p=>p.price!=null&&Math.abs(+p.price-fp)<1e-8))sold.push({price:fp,size:fs,time:null})}
+  sold.forEach(p=>{const t=p.time?Date.parse(String(p.time).replace(/(\.\d{3})\d+/,'$1'))/1000:c[c.length-1][0];if(!(t>=t0))return;const x=XT(t),y=Y(p.price);
+   const a=Math.abs(p.size||0),ds=a>=100?0:a>=10?1:4,sz=p.size==null?'':Number(p.size).toLocaleString('en-GB',{maximumFractionDigits:ds});
+   ctx.fillStyle='#c084fc';ctx.strokeStyle='#041018';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,4.5,0,7);ctx.fill();ctx.stroke();
+   tagBox(x+8,y-14,'Partial sold'+(sz?' '+sz:'')+' @ '+fmt(p.price),'#c084fc','#041018',cw)});
   // live price
   if(d.mark){const y=Math.round(Y(d.mark))+.5;ctx.strokeStyle='#1d9bf0';ctx.setLineDash([1,3]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cw,y);ctx.stroke();ctx.setLineDash([]);
    const x=X(c.length-1);ctx.fillStyle='#1d9bf0';ctx.shadowColor='#1d9bf0';ctx.shadowBlur=12;ctx.beginPath();ctx.arc(x,y,3.5,0,7);ctx.fill();ctx.shadowBlur=0;
