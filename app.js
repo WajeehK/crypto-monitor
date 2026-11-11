@@ -655,7 +655,7 @@ function modifyDlg(p){const d=document.createElement('div');d.className='sheet s
  const tick=setInterval(paint,1000);
  const close=()=>{clearInterval(tick);d.remove()};
  no.onclick=()=>close();d.addEventListener('click',e=>{if(e.target===d&&!busy)close()});
- const esc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',esc)}};addEventListener('keydown',esc);
+ const onEsc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',onEsc)}};addEventListener('keydown',onEsc);
  ok.onclick=async()=>{if(busy||ok.disabled)return;const v=cur(),effS=Number.isFinite(v.stop)?v.stop:p.stop,effT=Number.isFinite(v.target)?v.target:p.target;
   const val=tpslValid(p,effS,effT,v.mark);if(!val.ok){err.textContent=val.msg;return}
   busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
@@ -682,7 +682,7 @@ function partialDlg(p){const d=document.createElement('div');d.className='sheet 
   if(!busy){ok.disabled=false;ok.textContent='Confirm '+Math.round(f*100)+'%'}};
  d.querySelector('#fracs').addEventListener('click',e=>{const b=e.target.closest('[data-frac]');if(b&&!busy)pick(Number(b.dataset.frac))});
  const close=()=>d.remove();no.onclick=()=>close();d.addEventListener('click',e=>{if(e.target===d&&!busy)close()});
- const esc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',esc)}};addEventListener('keydown',esc);
+ const onEsc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',onEsc)}};addEventListener('keydown',onEsc);
  ok.onclick=async()=>{if(busy||frac==null)return;busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
   try{const {j,queued}=await sendTyped(p,{type:'partial',fraction:frac},st,ok);const f=frac;await waitResult(j,queued,st,ok,d,q=>{
     const px_=q.exit_price!=null?px(q.exit_price):px(liveMark(p));const pnl=q.pnl!=null?usd(q.pnl,1):'';return `Sold ${Math.round(f*100)}% at $${px_}${pnl?`, P&amp;L <span class="${cls(q.pnl)}">${pnl}</span>`:''}`})}
