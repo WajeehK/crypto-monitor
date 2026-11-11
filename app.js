@@ -6,7 +6,7 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s), REFRES
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS=['home','trades','markets','activity','stats'];
 let S=null, tab='home', filt='all', failed=0, tf={}, charts={}, posData={}, ICONS=new Set();
-const ENABLE_MODIFY_PARTIAL=false; // v23 flag. Keep false until Crypto Trader handles type=modify/partial (today any close-requests file is a full close). Flip to true and republish together with ENABLE_MODIFY_PARTIAL in gh/closesrv.py.
+const ENABLE_MODIFY_PARTIAL=true; // v24: on — Crypto Trader poller handles type=modify/partial. Keep in sync with ENABLE_MODIFY_PARTIAL in gh/closesrv.py.
 fetch('coins/index.json',{credentials:'same-origin'}).then(r=>r.json()).then(a=>{ICONS=new Set(a);if(S)render()}).catch(()=>{});
 const ci=(c,sz)=>{c=String(c||'?');const l=c.toLowerCase(),st=sz?` style="--s:${sz}px"`:'',fb=`<span class="ci lt"${st}>${esc(c.slice(0,1))}</span>`;
  // local pack first; else CoinMarketCap via markets data (covers new listings like ASTER until we ship a local file); else letter
@@ -109,8 +109,8 @@ function renderPositions(){
   box.innerHTML=S.positions.map(p=>`<article class="pos" data-sym="${esc(p.symbol)}"><div class="pos-h"></div>
    <div class="seg sm tfseg"><span class="sb"></span><button class="press ${tf[p.symbol]!=='1m'?'on':''}" data-tf="5m">5m</button><button class="press ${tf[p.symbol]==='1m'?'on':''}" data-tf="1m">1m</button></div>
    <div class="pchart"><canvas></canvas></div><div class="pos-b"></div><div class="sellrow">
-   <div class="actg"><button class="actb press" data-edit="${esc(p.symbol)}"${ENABLE_MODIFY_PARTIAL?'':' disabled aria-disabled="true"'}>Edit TP/SL</button>${ENABLE_MODIFY_PARTIAL?'':'<span class="soon">Coming soon</span>'}</div>
-   <div class="actg"><button class="actb press" data-partial="${esc(p.symbol)}"${ENABLE_MODIFY_PARTIAL?'':' disabled aria-disabled="true"'}>Partial TP</button>${ENABLE_MODIFY_PARTIAL?'':'<span class="soon">Coming soon</span>'}</div>
+   <div class="actg"><button class="actb press" data-edit="${esc(p.symbol)}">Edit TP/SL</button></div>
+   <div class="actg"><button class="actb press" data-partial="${esc(p.symbol)}">Partial TP</button></div>
    <button class="sellb press" data-sell="${esc(p.symbol)}">Sell</button></div></article>`).join('');
   box.querySelectorAll('.pos').forEach(el=>{const sym=el.dataset.sym;charts[sym]=PosChart(el.querySelector('canvas'));segInit(el.querySelector('.seg'),b=>{tf[sym]=b.dataset.tf;drawCharts()})})}
  S.positions.forEach(p=>{const el=box.querySelector(`.pos[data-sym="${p.symbol}"]`);if(!el)return;const h=posInfo(p);el.querySelector('.pos-h').innerHTML=h.head;el.querySelector('.pos-b').innerHTML=h.body});
@@ -418,6 +418,7 @@ function renderPosView(arg){
    tickBar(L.mark);details();$('#vtick').textContent=(L.src==='spot'?'spot ':'live ')+new Date(L.t).toLocaleTimeString('en-GB',{timeZone:TZ});$('#vlive').classList.remove('off')}
   else{details();$('#vlive').classList.add('off')}};
  poll();const iv=setInterval(poll,1000),iv2=setInterval(()=>loadPosData(true,sym),30000);
+ V.applyLevels=()=>{p=P()||p;if(ch)setLines();details()};
  V.cleanup=()=>{clearInterval(iv);clearInterval(iv2);if(ch)ch.c.remove()};
 }
 // open from a deep link (#trade/ID or #pos/SYM) once data has arrived
@@ -624,15 +625,27 @@ async function sendTyped(p, extra, st, okBtn){
    if(!r.ok)throw new Error('box unreachable and backup queue failed (HTTP '+r.status+')');queued=true;j={id}}
   return {j,queued,id}
 }
+function applyPosLevels(sym,q){
+  const pos=S&&S.positions.find(x=>x.symbol===sym);if(!pos)return pos;
+  if(q.stop!=null)pos.stop=q.stop;if(q.target!=null)pos.target=q.target;
+  if(q.remaining_size!=null)pos.size=q.remaining_size;
+  renderPositions();
+  if(typeof V!=='undefined'&&V&&V.sym===sym&&V.applyLevels)V.applyLevels();
+  return pos;
+}
 async function waitResult(j,queued,st,okBtn,d,fmt){
-  st.textContent=queued?'Box unreachable, sent via backup queue. Waiting for Crypto Trader (request valid 10 min)…':'Sent. Waiting for Crypto Trader…';okBtn.textContent='Pending…';
-  const t0=Date.now(),lim=queued?600000:60000;while(Date.now()-t0<lim){await new Promise(x=>setTimeout(x,2500));if(!d.isConnected)return;
+  st.textContent=queued?'Box unreachable, sent via backup queue. Waiting for Crypto Trader…':'Sent. Waiting for Crypto Trader…';okBtn.textContent='Pending…';
+  // Modify can take ~35s. Poller rejects requests older than 120s. Wait at least 60s before "still pending", keep polling until 120s (10 min if queued until the box picks it up).
+  const t0=Date.now();let seenPendingAt=null,pendingShown=false;
+  const deadline=()=>queued?(seenPendingAt?seenPendingAt+120000:t0+600000):t0+120000;
+  while(Date.now()<deadline()){await new Promise(x=>setTimeout(x,2500));if(!d.isConnected)return;
+   if(!pendingShown&&Date.now()-t0>=60000){pendingShown=true;st.textContent='Still pending…';okBtn.textContent='Still pending'}
    try{const q=await (await tfetch(boxURL()+'/close/'+j.id,{},8000)).json();
     if(q.status==='applied'||q.status==='closed'){const msg=fmt(q);st.innerHTML=`<b class="up">${msg}</b>`;okBtn.textContent='Done';toast(msg.replace(/<[^>]+>/g,' '));return}
     if(q.status==='rejected'){const msg='Rejected: '+(q.reason||'no reason given');st.innerHTML=`<b class="dn">${esc(msg)}</b>`;okBtn.textContent='Rejected';toast(msg);return}
-    if(queued&&q.status==='pending')st.textContent='Box received it. Waiting for Crypto Trader…'}catch(_){}}
-  const warn=queued?'Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.':'No response yet, Crypto Trader may be offline.';
-  st.innerHTML=`<b class="warn">${warn}</b>`;okBtn.textContent='No response';toast(warn)
+    if(q.status==='pending'){if(!seenPendingAt)seenPendingAt=Date.now();if(queued)st.textContent=pendingShown?'Still pending…':'Box received it. Waiting for Crypto Trader…'}}catch(_){}}
+  const warn=queued&&!seenPendingAt?'Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.':'Still pending. No result file yet — the request is only valid for 120s. Check the position.';
+  st.innerHTML=`<b class="warn">${warn}</b>`;okBtn.textContent='Still pending';toast(warn)
 }
 
 function modifyDlg(p){const d=document.createElement('div');d.className='sheet sellsh tpslsh';
@@ -666,7 +679,8 @@ function modifyDlg(p){const d=document.createElement('div');d.className='sheet s
   busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
   const stop=v.stop==null||near(v.stop,p.stop)?null:v.stop,target=v.target==null||near(v.target,p.target)?null:v.target;
   try{const {j,queued}=await sendTyped(p,{type:'modify',stop,target},st,ok);await waitResult(j,queued,st,ok,d,q=>{
-    const ns=q.stop??effS,nt=q.target??effT;return `Updated stop ${px(ns)} · target ${px(nt)}`})}
+    const pos=applyPosLevels(p.symbol,q);const ns=q.stop??(pos&&pos.stop)??effS,nt=q.target??(pos&&pos.target)??effT;
+    return `Updated stop ${px(ns)} · target ${px(nt)}`})}
    catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was changed. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false;toast("Couldn't send: "+(e.message||e))}}}
 
 function partialDlg(p){const d=document.createElement('div');d.className='sheet sellsh partsh';
@@ -690,7 +704,11 @@ function partialDlg(p){const d=document.createElement('div');d.className='sheet 
  const onEsc=e=>{if(e.key==='Escape'&&!busy){close();removeEventListener('keydown',onEsc)}};addEventListener('keydown',onEsc);
  ok.onclick=async()=>{if(busy||frac==null)return;busy=true;ok.disabled=true;ok.textContent='Sending…';no.textContent='Close';
   try{const {j,queued}=await sendTyped(p,{type:'partial',fraction:frac},st,ok);const f=frac;await waitResult(j,queued,st,ok,d,q=>{
-    const px_=q.exit_price!=null?px(q.exit_price):px(liveMark(p));const pnl=q.pnl!=null?usd(q.pnl,1):'';return `Sold ${Math.round(f*100)}% at $${px_}${pnl?`, P&amp;L <span class="${cls(q.pnl)}">${pnl}</span>`:''}`})}
+    applyPosLevels(p.symbol,q);
+    const sold=q.closed_size!=null?qty(q.closed_size):qty((p.size||0)*f);
+    const left=q.remaining_size!=null?qty(q.remaining_size):null;
+    const pnl=q.pnl!=null?`<span class="${cls(q.pnl)}">${usd(q.pnl,1)}</span>`:'';
+    return `Sold ${sold} ${esc(p.coin)}${pnl?`, P&amp;L ${pnl}`:''}${left!=null?`. ${left} remaining`:''}`})}
    catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was sold. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false;toast("Couldn't send: "+(e.message||e))}}}
 
 (()=>{const ex=+localStorage.getItem('ct_kexp');if(ex)$('#lkuntil').textContent='Remembered until '+new Date(ex).toLocaleDateString('en-GB',{day:'numeric',month:'short'});$('#lockbtn').onclick=()=>{if(confirm('Lock this device? You will need the password again.'))lockDevice()}})();
