@@ -429,3 +429,6 @@ html,body{background:#000!important}
 .fracb.on{border-color:var(--up);background:rgba(0,186,124,.12);box-shadow:0 0 0 1px var(--up)}
 .partcf{margin:8px 0;text-align:center}
 @media(max-width:360px){.actb,.sellb{padding:8px 12px;font-size:13px}}
+
+.legend i.legdot{width:8px;height:8px;border:0;border-radius:50%;vertical-align:middle;margin-right:5px;display:inline-block}
+.pf .tg.sold{color:#38bdf8;border-color:#38bdf8}

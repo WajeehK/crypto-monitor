@@ -18,6 +18,7 @@ const usd=(v,sign)=>v==null?'—':(sign&&v>0?'+':v<0?'−':'')+'$'+Math.abs(v).t
 const pct=v=>v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2)+'%';
 const px=v=>{if(v==null)return '—';const a=Math.abs(v);const d=a>=1000?1:a>=10?2:a>=1?3:a>=0.1?5:6;return v.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d})};
 const qty=v=>v==null?'—':v.toLocaleString('en-GB',{maximumFractionDigits:4});
+const qtyS=v=>v==null?'—':Number(v).toLocaleString('en-GB',{maximumFractionDigits:Math.abs(v)>=100?0:Math.abs(v)>=10?1:4});
 const cls=v=>v>0?'up':v<0?'dn':'mut';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pd=t=>t?new Date(String(t).replace(' GMT','Z').replace(' UTC','Z').replace(' BST','+01:00').replace(/^(\d{4}-\d\d-\d\d) /,'$1T').replace(/(\.\d{3})\d+/,'$1')):null;
@@ -96,7 +97,7 @@ function posInfo(p){
   parts=`<div class="parts"><div class="ph"><span><b>Partial exits</b> <span class="mut">· ${qty(sold)} of ${qty(p.original_size)} sold</span></span><b class="${cls(p.partial_pnl)}">${usd(p.partial_pnl,1)} realised</b></div>
   <div class="szbar"><i style="width:${pr}%;background:#ffb020"></i><i style="width:${100-pr}%;background:#1d9bf0"></i></div>
   <div class="szl"><span>Sold ${qty(sold)}</span><span>Remaining ${qty(p.size)}</span></div>
-  ${p.partials.map(f=>`<div class="pf"><span class="tg">TP</span><span>${qty(f.size)} @ ${px(f.price)} <span class="mut">· ${hm(f.time)}</span></span><b class="${cls(f.pnl)}">${usd(f.pnl,1)}</b></div>`).join('')}</div>`}
+  ${p.partials.map(f=>`<div class="pf"><span class="tg sold">Sold</span><span>${qty(f.size)} @ ${px(f.price)} <span class="mut">· ${hm(f.time)}</span></span><b class="${cls(f.pnl)}">${usd(f.pnl,1)}</b></div>`).join('')}</div>`}
  return {head:`<div class="pt">${ci(p.coin,30)}<span class="cn">${esc(p.coin)}</span><span class="sd ${lo?'long':'short'}">${lo?'LONG':'SHORT'}</span><span class="mut">${p.leverage?p.leverage+'× · ':''}open ${dur(p.opened)||'—'}</span></div>
   <div class="pnlrow"><span class="pnl ${cls(p.upnl)}">${usd(p.upnl,1)}</span><span class="pc ${cls(p.upnl)}">${pct(p.upnl_pct)}</span><span class="mut">unrealised</span></div>`,
  body:`<div class="kvg"><div><span>Entry</span><b>${px(p.entry)}</b></div><div><span>Price</span><b>${px(p.mark)}</b></div><div><span>Size</span><b>${qty(p.size)}${sold>0?`<span class="mut" style="font-weight:500"> / ${qty(p.original_size)}</span>`:''}</b></div>
@@ -343,7 +344,7 @@ async function renderTrade(id){
   line(s,d.entry,'ENTRY','#e7e9ea',2);line(s,d.exit,'EXIT','#1d9bf0',0);line(s,d.stop_at_entry,d.stop_moved?'STOP (moved)':'STOP','#f91880',2);line(s,d.target_at_entry,'TARGET','#00ba7c',2);
   const res=RESS[d.res]||300,mk=[];const et=tsec(d.entry_time),xt=tsec(d.exit_time);
   if(et)mk.push({time:snap(et,res),position:lo?'belowBar':'aboveBar',color:'#a78bfa',shape:lo?'arrowUp':'arrowDown',text:'IN '+px(d.entry)});
-  (d.linked_exits||[]).forEach(f=>{const ft=tsec(f.time);if(ft)mk.push({time:snap(ft,res),position:lo?'aboveBar':'belowBar',color:'#ffb020',shape:'circle',text:'TP '+qty(f.size)})});
+  (d.linked_exits||[]).forEach(f=>{const ft=tsec(f.time);if(ft)mk.push({time:snap(ft,res),position:lo?'aboveBar':'belowBar',color:'#38bdf8',shape:'circle',text:'Partial sold '+qtyS(f.size)+(f.price?' @ '+px(f.price):'')})});
   if(xt)mk.push({time:snap(xt,res),position:lo?'aboveBar':'belowBar',color:(d.pnl||0)>0?'#00ba7c':'#f91880',shape:lo?'arrowDown':'arrowUp',text:'OUT '+px(d.exit)});
   mk.sort((a,b)=>a.time-b.time);s.setMarkers(mk);c.timeScale().fitContent();V.cleanup=()=>c.remove()}
  else if(d.candles)$('#tchart').innerHTML='<div class="ld">No chart data for this window.</div>';
@@ -360,7 +361,7 @@ async function renderTrade(id){
  <div class="dsec"><h3>Account</h3><div class="dgrid">${cell('Equity before',usd(d.equity_before))}${cell('Equity after',usd(d.equity_after),'',cls(d.pnl))}</div></div>
  <div class="dsec"><h3>Fills</h3><div class="panel flist">
   ${d.entry_fill?`<div class="pf"><span class="tg" style="color:var(--vi)">IN</span><span>${qty(d.entry_size)} @ ${px(d.entry)} <span class="mut">· ${esc(d.entry_fill.id)} · ${human(d.entry_fill.type)}${d.entry_fill.client_id?' · '+esc(d.entry_fill.client_id):''}</span></span><b>${usd(d.entry_fill.fee)}</b></div>`:''}
-  ${(d.linked_exits||[]).map(f=>`<div class="pf" data-tid="${esc(f.id)}" style="cursor:pointer"><span class="tg">TP</span><span>${qty(f.size)} @ ${px(f.price)} <span class="mut">· ${esc(f.id)} · ${when(f.time)} (other exit)</span></span><b class="${cls(f.pnl)}">${usd(f.pnl,1)}</b></div>`).join('')}
+  ${(d.linked_exits||[]).map(f=>`<div class="pf" data-tid="${esc(f.id)}" style="cursor:pointer"><span class="tg sold">Sold</span><span>${qty(f.size)} @ ${px(f.price)} <span class="mut">· ${esc(f.id)} · ${when(f.time)} (other exit)</span></span><b class="${cls(f.pnl)}">${usd(f.pnl,1)}</b></div>`).join('')}
   <div class="pf"><span class="tg" style="color:${(d.pnl||0)>0?'var(--up)':'var(--dn)'}">OUT</span><span>${qty(d.size)} @ ${px(d.exit)} <span class="mut">· ${esc(d.exit_fill?d.exit_fill.id:d.id)}${d.exit_fill&&d.exit_fill.client_id?' · '+esc(d.exit_fill.client_id):''}</span></span><b class="${cls(d.pnl)}">${pnlS}</b></div></div></div>`;
  $('#tdet').querySelectorAll('[data-tid]').forEach(el=>el.onclick=()=>openView('trade',el.dataset.tid));
 }
@@ -384,14 +385,14 @@ function renderPosView(arg){
  let tfv=tf[sym+'_v']||'5m';
  vbody.innerHTML=`<div id="phero"></div><div class="tfrow"><div class="seg sm" id="vtf"><span class="sb"></span>${['1m','5m','15m','1h'].map(x=>`<button class="press ${x===tfv?'on':''}" data-tf="${x}">${x}</button>`).join('')}</div><span class="mut" style="font-size:13px" id="vtick"></span></div>
  <div class="lwbox" id="pchart"><div class="ld">Loading chart…</div></div>
- <div class="legend"><span><i style="color:#e7e9ea"></i>Entry</span><span><i style="color:#f91880"></i>Stop</span><span><i style="color:#00ba7c"></i>Target</span><span><i style="color:#ffb020;border-top-style:dotted"></i>Partial exit</span><span>Pinch / drag to zoom & pan</span></div><div class="srcnote">Candles: Kraken spot ${esc(spotPair(p.coin).replace('USD','/USD'))} · price, P&amp;L: Kraken Futures mark, live in your browser</div><div id="pdet"></div>`;
+ <div class="legend"><span><i style="color:#e7e9ea"></i>Entry</span><span><i style="color:#f91880"></i>Stop</span><span><i style="color:#00ba7c"></i>Target</span><span><i class="legdot" style="background:#38bdf8"></i>Partial sold</span><span>Pinch / drag to zoom & pan</span></div><div class="srcnote">Candles: Kraken spot ${esc(spotPair(p.coin).replace('USD','/USD'))} · price, P&amp;L: Kraken Futures mark, live in your browser</div><div id="pdet"></div>`;
  let ch=null,lines=[],lastBar=null,res=RESS[tfv],live=null;
  function build(){const d=posData[sym];const bars=d&&d.tf&&d.tf[tfv];if(!bars||!bars.length)return;
   if(!ch){const el=$('#pchart');el.innerHTML='';ch=mkChart(el,p.entry,()=>[p.entry,p.stop,p.target])}
   const b=toBars(bars);ch.s.setData(b);lastBar=Object.assign({},b[b.length-1]);res=RESS[tfv];setLines();setMarks();ch.c.timeScale().scrollToRealTime()}
  function setLines(){lines.forEach(l=>ch.s.removePriceLine(l));lines=[line(ch.s,p.entry,'ENTRY','#e7e9ea',2),line(ch.s,p.stop,'STOP','#f91880',2),line(ch.s,p.target,'TARGET','#00ba7c',2)].filter(Boolean)}
  function setMarks(){const lo=p.side==='long',mk=[];const ot=tsec(p.opened);if(ot)mk.push({time:snap(ot,res),position:lo?'belowBar':'aboveBar',color:'#a78bfa',shape:lo?'arrowUp':'arrowDown',text:'IN '+px(p.entry)});
-  (p.partials||[]).forEach(f=>{const t=tsec(f.time);if(t)mk.push({time:snap(t,res),position:lo?'aboveBar':'belowBar',color:'#ffb020',shape:'circle',text:'TP '+qty(f.size)+' @ '+px(f.price)})});
+  (p.partials||[]).forEach(f=>{const t=tsec(f.time);if(t)mk.push({time:snap(t,res),position:lo?'aboveBar':'belowBar',color:'#38bdf8',shape:'circle',text:'Partial sold '+qtyS(f.size)+' @ '+px(f.price)})});
   const first=ch.s.data()[0];ch.s.setMarkers(mk.filter(m=>!first||m.time>=first.time).sort((a,b)=>a.time-b.time))}
  function tickBar(mark){if(!ch||!lastBar||!mark)return;const now=Math.floor(Date.now()/1000),bt=snap(now,res);
   if(bt>lastBar.time)lastBar={time:bt,open:lastBar.close,high:mark,low:mark,close:mark};else{lastBar.close=mark;lastBar.high=Math.max(lastBar.high,mark);lastBar.low=Math.min(lastBar.low,mark)}
@@ -400,7 +401,7 @@ function renderPosView(arg){
   const toStop=p.stop&&mark?(p.stop-mark)*p.size*sg:null,toTgt=p.target&&mark?(p.target-mark)*p.size*sg:null,sold=(p.original_size||p.size)-p.size;
   $('#phero').innerHTML=`<div class="v-hero"><span class="pnl ${cls(upnl)}">${usd(upnl,1)}</span><span class="${cls(upnl)}" style="font-size:17px;font-weight:700">${pct(upct)}</span><span class="mut">unrealised</span></div>
    <div class="v-sub">Price <b style="color:var(--tx)">${px(mark)}</b>${L.bid?` · bid ${px(L.bid)} / ask ${px(L.ask)}`:''} · open ${dur(p.opened)||'—'}</div>`;
-  const parts=(p.partials||[]).map(f=>`<div class="pf"><span class="tg">TP</span><span>${qty(f.size)} @ ${px(f.price)} <span class="mut">· ${when(f.time)}</span></span><b class="${cls(f.pnl)}">${usd(f.pnl,1)}</b></div>`).join('');
+  const parts=(p.partials||[]).map(f=>`<div class="pf"><span class="tg sold">Sold</span><span>${qty(f.size)} @ ${px(f.price)} <span class="mut">· ${when(f.time)}</span></span><b class="${cls(f.pnl)}">${usd(f.pnl,1)}</b></div>`).join('');
   $('#pdet').innerHTML=`<div class="dsec"><h3>Position</h3><div class="dgrid">${cell('Entry',px(p.entry),when(p.opened))}${cell('Current price',px(mark),'mark · live')}
    ${cell('Size',qty(p.size)+' '+esc(p.coin),sold>0?`of ${qty(p.original_size)} (${qty(sold)} sold)`:'')}${cell('Notional',usd(mark*p.size),p.leverage?'margin ~'+usd(p.entry*p.size/p.leverage):'')}
    ${cell('Leverage',p.leverage?p.leverage+'×':'—')}${cell('Time open',dur(p.opened)||'—')}</div></div>
@@ -539,10 +540,28 @@ async function aesEnc(obj){const raw=Uint8Array.from(atob(localStorage.getItem('
  const k=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt']),iv=crypto.getRandomValues(new Uint8Array(12));
  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode('ctmon')},k,new TextEncoder().encode(JSON.stringify(obj))));
  const u=new Uint8Array(15+ct.length);u.set([67,84,49]);u.set(iv,3);u.set(ct,15);let b='';u.forEach(x=>b+=String.fromCharCode(x));return btoa(b)}
+async function aesDec(b64){const raw=Uint8Array.from(atob(localStorage.getItem('ct_k').replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
+ const bin=Uint8Array.from(atob(String(b64).replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));if(bin[0]!==67||bin[1]!==84||bin[2]!==49)throw new Error('bad ct1');
+ const k=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
+ const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:bin.slice(3,15),additionalData:new TextEncoder().encode('ctmon')},k,bin.slice(15));
+ return JSON.parse(new TextDecoder().decode(pt))}
 const uuid4=()=>crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
 async function hsig(msg){const raw=Uint8Array.from(atob(localStorage.getItem('ct_k').replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
  const k=await crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign']);
  return [...new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)))].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function qTopic(){return 'ctq'+(await hsig('ct-close-q')).slice(0,32)}
+async function rTopic(){return 'ctr'+(await hsig('ct-close-r')).slice(0,32)}
+async function pollCloseResult(id){
+  try{const r=await tfetch(boxURL()+'/close/'+id,{},4000);if(r.ok){const q=await r.json();if(q&&q.status)return q}}catch(_){}
+  try{const r=await tfetch('https://ntfy.sh/'+(await rTopic())+'/json?poll=1&since=15m',{},5000);if(!r.ok)return null;
+    for(const ln of(await r.text()).split('\n')){if(!ln.trim())continue;let m;try{m=JSON.parse(ln)}catch(_){continue}
+     if(m.event!=='message'||!m.message)continue;try{const q=await aesDec(m.message);if(q&&q.id===id&&q.status)return q}catch(_){}}}catch(_){}
+  return null}
+function applyCloseResult(q,st,okBtn,fmt){
+  if(!q||!q.status||q.status==='pending')return false;
+  if(q.status==='applied'||q.status==='closed'){const msg=fmt(q);st.innerHTML=`<b class="up">${msg}</b>`;okBtn.textContent='Done';toast(msg.replace(/<[^>]+>/g,' '));return true}
+  if(q.status==='rejected'){const msg='Rejected: '+(q.reason||'no reason given');st.innerHTML=`<b class="dn">${esc(msg)}</b>`;okBtn.textContent='Rejected';toast(msg);return true}
+  return false}
 function sellDlg(p){const d=document.createElement('div');d.className='sheet sellsh';
  d.innerHTML=`<div class="sh-card"><b>Close ${esc(p.symbol)} ${esc(p.side)} at market?</b><p>Stop/TP will be cancelled.<br><span class="mut">Entry ${px(p.entry)} · size ${qty(p.size)}</span></p><p class="sellst" id="sellst"></p>
   <div class="sellbtns"><button class="pill ghost press" id="sellno">Cancel</button><button class="pill sellgo press" id="sellok">Sell</button></div></div>`;
@@ -553,21 +572,27 @@ function sellDlg(p){const d=document.createElement('div');d.className='sheet sel
   try{const pl=JSON.stringify({pair:p.symbol,side:p.side,entry_price:p.entry,ts:Date.now()/1000,nonce:crypto.getRandomValues(new Uint32Array(2)).join('-'),id});
    const body=JSON.stringify({p:pl,s:await hsig(pl)});
    // 1) direct to the box, 4 tries over ~25s (box may be waking up)
-   for(let a=1;a<=4&&!j;a++){
-    try{const r=await tfetch(boxURL()+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body},9000);const x=await r.json();
+   for(let a=1;a<=3&&!j;a++){
+    try{const r=await tfetch(boxURL()+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body},5000);const x=await r.json();
      if(r.ok&&x.id){j=x;break}if(r.status>=400&&r.status<500)throw Object.assign(new Error(x.error||('HTTP '+r.status)),{fatal:true});lastErr='HTTP '+r.status}
     catch(e){if(e.fatal)throw e;lastErr=e.name==='AbortError'?'timed out':'no connection'}
-    if(a<4){st.textContent=`Box not answering (${lastErr}), retrying ${a+1}/4…`;await new Promise(x=>setTimeout(x,2000*a))}}
-   // 2) backup queue: same signed request, encrypted, via ntfy.sh; the box picks it up when reachable (valid 10 min)
-   if(!j){const r=await tfetch('https://ntfy.sh/ctq'+(await hsig('ct-close-q')).slice(0,32),{method:'POST',body:await aesEnc(JSON.parse(body))},10000);
+    if(a<3){st.textContent=`Box not answering (${lastErr}), retrying ${a+1}/3…`;await new Promise(x=>setTimeout(x,1000))}}
+   // 2) backup queue: same signed request, encrypted, via ntfy.sh; the box picks it up when reachable
+   if(!j){st.textContent='Box link down, sending via backup queue…';const r=await tfetch('https://ntfy.sh/'+(await qTopic()),{method:'POST',body:await aesEnc(JSON.parse(body))},10000);
     if(!r.ok)throw new Error('box unreachable and backup queue failed (HTTP '+r.status+')');queued=true;j={id}}
-   st.textContent=queued?'Box unreachable, sent via backup queue. It will close as soon as the box answers (request valid 10 min)…':'Sent. Waiting for Crypto Trader…';ok.textContent='Pending…';
-   const t0=Date.now(),lim=queued?600000:60000;while(Date.now()-t0<lim){await new Promise(x=>setTimeout(x,2500));if(!d.isConnected)return;
-    try{const q=await (await tfetch(boxURL()+'/close/'+j.id,{},8000)).json();
-     if(q.status==='closed'){st.innerHTML=`<b class="up">Closed at $${px(q.exit_price)}, P&amp;L <span class="${cls(q.pnl)}">${usd(q.pnl,1)}</span></b>`;ok.textContent='Done';return}
-     if(q.status==='rejected'){st.innerHTML=`<b class="dn">Rejected: ${esc(q.reason||'no reason given')}</b>`;ok.textContent='Rejected';return}
-     if(queued&&q.status==='pending')st.textContent='Box received it. Waiting for Crypto Trader…'}catch(_){}}
-   st.innerHTML=queued?'<b class="warn">Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.</b>':'<b class="warn">No response yet, Crypto Trader may be offline.</b>';ok.textContent='No response'}
+   st.textContent=queued?'Box link is down. Request sent via backup queue — waiting for Crypto Trader to close it.':'Sent. Waiting for Crypto Trader…';ok.textContent='Waiting…';
+   const t0=Date.now();let seenPendingAt=null,note60=false;
+   const deadline=()=>queued?(seenPendingAt?seenPendingAt+120000:t0+600000):t0+120000;
+   const fmt=q=>`Closed at $${px(q.exit_price)}, P&amp;L <span class="${cls(q.pnl)}">${usd(q.pnl,1)}</span>`;
+   while(Date.now()<deadline()){await new Promise(x=>setTimeout(x,2000));if(!d.isConnected)return;
+    const q=await pollCloseResult(j.id);
+    if(q&&q.status==='pending'){if(!seenPendingAt)seenPendingAt=Date.now();st.textContent=queued?'Backup queue delivered. Waiting for Crypto Trader to close it.':'Sent. Waiting for Crypto Trader…'}
+    if(applyCloseResult(q,st,ok,fmt))return;
+    if(!note60&&Date.now()-t0>=60000){note60=true;ok.textContent='Waiting';
+     st.innerHTML=queued&&!seenPendingAt
+      ?'<b class="warn">Still waiting. The box link is down; your request is in the backup queue and is valid for 120s after the box picks it up. I am still checking.</b>'
+      :'<b class="warn">Still waiting for a result. I will keep checking until 120s, then stop — check the position if nothing changes.</b>'}}
+   st.innerHTML=queued&&!seenPendingAt?'<b class="warn">Stopped waiting after 10 min: the box never picked up the backup request, so it will not run. Check the position and try again when the box link is back.</b>':'<b class="warn">Stopped waiting after 120s with no result. The request may have expired. Check the position — if it is still open, try again.</b>';ok.textContent='Timed out'}
   catch(e){st.innerHTML=`<b class="dn">Couldn't send: ${esc(e.message||e)}. Nothing was closed. Tap Retry.</b>`;ok.disabled=false;ok.textContent='Retry';busy=false}}}
 
 /* ---------- v23: Edit TP/SL + Partial TP (feature-flagged; send path mirrors Sell, never omits type on these requests) ---------- */
@@ -616,12 +641,12 @@ async function sendTyped(p, extra, st, okBtn){
   const id=uuid4();let j=null,queued=false,lastErr='';
   const pl=JSON.stringify(Object.assign({pair:p.symbol,side:p.side,entry_price:p.entry,ts:Date.now()/1000,nonce:crypto.getRandomValues(new Uint32Array(2)).join('-'),id},extra));
   const body=JSON.stringify({p:pl,s:await hsig(pl)});
-  for(let a=1;a<=4&&!j;a++){
-   try{const r=await tfetch(boxURL()+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body},9000);const x=await r.json();
+  for(let a=1;a<=3&&!j;a++){
+   try{const r=await tfetch(boxURL()+'/close',{method:'POST',headers:{'Content-Type':'text/plain'},body},5000);const x=await r.json();
     if(r.ok&&x.id){j=x;break}if(r.status>=400&&r.status<500)throw Object.assign(new Error(x.error||('HTTP '+r.status)),{fatal:true});lastErr='HTTP '+r.status}
    catch(e){if(e.fatal)throw e;lastErr=e.name==='AbortError'?'timed out':'no connection'}
-   if(a<4){st.textContent=`Box not answering (${lastErr}), retrying ${a+1}/4…`;await new Promise(x=>setTimeout(x,2000*a))}}
-  if(!j){const r=await tfetch('https://ntfy.sh/ctq'+(await hsig('ct-close-q')).slice(0,32),{method:'POST',body:await aesEnc(JSON.parse(body))},10000);
+   if(a<3){st.textContent=`Box not answering (${lastErr}), retrying ${a+1}/3…`;await new Promise(x=>setTimeout(x,1000))}}
+  if(!j){st.textContent='Box link down, sending via backup queue…';const r=await tfetch('https://ntfy.sh/'+(await qTopic()),{method:'POST',body:await aesEnc(JSON.parse(body))},10000);
    if(!r.ok)throw new Error('box unreachable and backup queue failed (HTTP '+r.status+')');queued=true;j={id}}
   return {j,queued,id}
 }
@@ -634,18 +659,22 @@ function applyPosLevels(sym,q){
   return pos;
 }
 async function waitResult(j,queued,st,okBtn,d,fmt){
-  st.textContent=queued?'Box unreachable, sent via backup queue. Waiting for Crypto Trader…':'Sent. Waiting for Crypto Trader…';okBtn.textContent='Pending…';
-  // Modify can take ~35s. Poller rejects requests older than 120s. Wait at least 60s before "still pending", keep polling until 120s (10 min if queued until the box picks it up).
-  const t0=Date.now();let seenPendingAt=null,pendingShown=false;
+  st.textContent=queued?'Box link is down. Request sent via backup queue — waiting for Crypto Trader to apply it.':'Sent. Waiting for Crypto Trader…';okBtn.textContent='Waiting…';
+  const t0=Date.now();let seenPendingAt=null,note60=false;
   const deadline=()=>queued?(seenPendingAt?seenPendingAt+120000:t0+600000):t0+120000;
-  while(Date.now()<deadline()){await new Promise(x=>setTimeout(x,2500));if(!d.isConnected)return;
-   if(!pendingShown&&Date.now()-t0>=60000){pendingShown=true;st.textContent='Still pending…';okBtn.textContent='Still pending'}
-   try{const q=await (await tfetch(boxURL()+'/close/'+j.id,{},8000)).json();
-    if(q.status==='applied'||q.status==='closed'){const msg=fmt(q);st.innerHTML=`<b class="up">${msg}</b>`;okBtn.textContent='Done';toast(msg.replace(/<[^>]+>/g,' '));return}
-    if(q.status==='rejected'){const msg='Rejected: '+(q.reason||'no reason given');st.innerHTML=`<b class="dn">${esc(msg)}</b>`;okBtn.textContent='Rejected';toast(msg);return}
-    if(q.status==='pending'){if(!seenPendingAt)seenPendingAt=Date.now();if(queued)st.textContent=pendingShown?'Still pending…':'Box received it. Waiting for Crypto Trader…'}}catch(_){}}
-  const warn=queued&&!seenPendingAt?'Box still not answering after 10 min. The request has expired and will not run. Check the position and try again.':'Still pending. No result file yet — the request is only valid for 120s. Check the position.';
-  st.innerHTML=`<b class="warn">${warn}</b>`;okBtn.textContent='Still pending';toast(warn)
+  while(Date.now()<deadline()){await new Promise(x=>setTimeout(x,2000));if(!d.isConnected)return;
+   const q=await pollCloseResult(j.id);
+   if(q&&q.status==='pending'){if(!seenPendingAt)seenPendingAt=Date.now();
+    st.textContent=queued?'Backup queue delivered. Waiting for Crypto Trader to apply it (usually under 35s).':'Sent. Waiting for Crypto Trader to apply it (usually under 35s).'}
+   if(applyCloseResult(q,st,okBtn,fmt))return;
+   if(!note60&&Date.now()-t0>=60000){note60=true;okBtn.textContent='Waiting';
+    st.innerHTML=queued&&!seenPendingAt
+      ?'<b class="warn">Still waiting. The box link is down; your request is in the backup queue and is valid for 120s after the box picks it up. I am still checking.</b>'
+      :'<b class="warn">Still waiting for a result. This can take about 35s. I will keep checking until 120s, then stop — check the position if nothing changes.</b>'}}
+  const warn=queued&&!seenPendingAt
+    ?'Stopped waiting after 10 min: the box never picked up the backup request, so it will not run. Check the position and try again when the box link is back.'
+    :'Stopped waiting after 120s with no result. The request may have expired. Check the position — if nothing changed, try again.';
+  st.innerHTML=`<b class="warn">${warn}</b>`;okBtn.textContent='Timed out';toast(warn)
 }
 
 function modifyDlg(p){const d=document.createElement('div');d.className='sheet sellsh tpslsh';

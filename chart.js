@@ -44,10 +44,11 @@ window.PosChart=function(canvas){
   // push overlapping tags apart (min 19px)
   tags.sort((a,b)=>a.y-b.y);for(let k=0;k<3;k++){for(let i=1;i<tags.length;i++){const g=tags[i].ty-tags[i-1].ty;if(g<19){const m=(19-g)/2;tags[i-1].ty-=m;tags[i].ty+=m}}}
   tags.forEach(t=>t.ty=Math.max(9,Math.min(H-padB+6,t.ty)));
-  // partial exits
+  // partial exits: a dot on the exit candle at the fill price, never a level line, never labelled TP
   (d.partials||[]).forEach(p=>{const t=Date.parse(p.time.replace(/(\.\d{3})\d+/,'$1'))/1000;if(t<t0)return;const x=XT(t),y=Y(p.price);
-   ctx.fillStyle='#ffb020';ctx.beginPath();ctx.moveTo(x,y-3);ctx.lineTo(x-6,y-13);ctx.lineTo(x+6,y-13);ctx.closePath();ctx.fill();
-   ctx.font='700 10px JetBrains Mono, monospace';ctx.textBaseline='bottom';ctx.fillText('TP '+p.size.toLocaleString('en-GB'),Math.min(x-18,cw-60),y-15)});
+   const a=Math.abs(p.size),ds=a>=100?0:a>=10?1:4,sz=Number(p.size).toLocaleString('en-GB',{maximumFractionDigits:ds});
+   ctx.fillStyle='#38bdf8';ctx.strokeStyle='#041018';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,4.5,0,7);ctx.fill();ctx.stroke();
+   tagBox(x+8,y-14,'Partial sold '+sz+' @ '+fmt(p.price),'#38bdf8','#041018',cw)});
   // live price
   if(d.mark){const y=Math.round(Y(d.mark))+.5;ctx.strokeStyle='#1d9bf0';ctx.setLineDash([1,3]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cw,y);ctx.stroke();ctx.setLineDash([]);
    const x=X(c.length-1);ctx.fillStyle='#1d9bf0';ctx.shadowColor='#1d9bf0';ctx.shadowBlur=12;ctx.beginPath();ctx.arc(x,y,3.5,0,7);ctx.fill();ctx.shadowBlur=0;
