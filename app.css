@@ -422,7 +422,7 @@ html,body{background:#000!important}
 .tpsl-prev b{font-size:18px}
 .tpsl-card .err{color:var(--dn);font-weight:600;min-height:1.2em;margin:8px 0 0;font-size:13.5px}
 .tpsl-card .err:empty{display:none}
-.pill.tpslgo{background:var(--up);color:#000}.pill.tpslgo:disabled{opacity:.45}
+.pill.tpslgo{background:var(--up);color:#000}.pill.tpslgo:disabled{opacity:1;background:rgba(255,255,255,.1);color:var(--mu)}
 .fracs{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 .fracb{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;text-align:left;padding:12px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04)}
 .fracb b{font-size:18px}.fracb span{color:var(--mu);font-weight:600}
