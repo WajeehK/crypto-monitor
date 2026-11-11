@@ -589,12 +589,17 @@ function tpslChart(cv,p,getV,setV){
   const levels=[{k:'entry',px:p.entry,c:'#e7e9ea',lab:'ENTRY',drag:false},{k:'mark',px:v.mark,c:'#1d9bf0',lab:'MARK',drag:false},{k:'stop',px:v.stop,c:'#f91880',lab:'STOP',drag:true},{k:'target',px:v.target,c:'#00ba7c',lab:'TARGET',drag:true}].filter(x=>Number.isFinite(x.px));
   const xs=levels.map(x=>x.px);const pad=Math.max((Math.max(...xs)-Math.min(...xs))*0.18, (v.mark||p.entry||1)*0.008);
   let mn=Math.min(...xs)-pad,mx=Math.max(...xs)+pad;if(mx<=mn){mn-=1;mx+=1}
-  const L=10,R=cssW-56,T=12,B=cssH-12,Y=pr=>T+(1-(pr-mn)/(mx-mn))*(B-T);
+  const L=10,R=cssW-10,T=16,B=cssH-16,Y=pr=>T+(1-(pr-mn)/(mx-mn))*(B-T);
   const bars=((posData[p.symbol]||{}).tf||{})['5m']||((posData[p.symbol]||{}).tf||{})['1m']||[];
   if(bars.length>2){const n=bars.slice(-60),w=(R-L)/Math.max(1,n.length-1);g.beginPath();n.forEach((c,i)=>{const y=Y(c[4]??c.close??c[1]);g[i?'lineTo':'moveTo'](L+i*w,y)});g.strokeStyle='rgba(255,255,255,.22)';g.lineWidth=1.2;g.stroke()}
-  levels.forEach(x=>{const y=Y(x.px);g.beginPath();g.moveTo(L,y);g.lineTo(R,y);g.strokeStyle=x.c;g.lineWidth=x.drag?2:1;g.setLineDash(x.drag?[]:[4,4]);g.stroke();g.setLineDash([]);
-   g.fillStyle=x.c;g.font='700 10px ui-monospace,monospace';g.textBaseline='middle';g.fillText(x.lab+' '+rawpx(x.px),R+4,y);
-   if(x.drag){g.beginPath();g.arc(L+8,y,5,0,Math.PI*2);g.fill()}})}
+  const ys=levels.map(x=>({x,y:Y(x.px)})).sort((a,b)=>a.y-b.y);
+  for(let i=1;i<ys.length;i++){if(ys[i].y-ys[i-1].y<14)ys[i].y=Math.min(B,ys[i-1].y+14)}
+  for(let i=ys.length-2;i>=0;i--){if(ys[i+1].y-ys[i].y<14)ys[i].y=Math.max(T,ys[i+1].y-14)}
+  ys.forEach(({x,y})=>{const ly=Y(x.px);g.beginPath();g.moveTo(L,ly);g.lineTo(R,ly);g.strokeStyle=x.c;g.lineWidth=x.drag?2:1;g.setLineDash(x.drag?[]:[4,4]);g.stroke();g.setLineDash([]);
+   if(x.drag){g.beginPath();g.arc(L+8,ly,5,0,Math.PI*2);g.fillStyle=x.c;g.fill()}
+   const lab=x.lab+' '+rawpx(x.px);g.font='700 10px ui-monospace,monospace';const tw=g.measureText(lab).width+10;
+   const lx=x.drag?L+16:R-tw-2;g.fillStyle='rgba(0,0,0,.72)';g.fillRect(lx,y-8,tw,16);
+   g.fillStyle=x.c;g.textBaseline='middle';g.fillText(lab,lx+5,y)})}
  const hit=y=>{const v=getV(),dpr=Math.max(1,window.devicePixelRatio||1),cssH=cv.clientHeight||160,cssW=cv.clientWidth||320;
   const xs=[v.stop,v.target,v.mark,p.entry].filter(Number.isFinite);const pad=Math.max((Math.max(...xs)-Math.min(...xs))*0.18,(v.mark||p.entry||1)*0.008);
   let mn=Math.min(...xs)-pad,mx=Math.max(...xs)+pad;if(mx<=mn){mn-=1;mx+=1}
@@ -642,7 +647,7 @@ function modifyDlg(p){const d=document.createElement('div');d.className='sheet s
  document.body.appendChild(d);
  const st=d.querySelector('#editst'),ok=d.querySelector('#editok'),no=d.querySelector('#editno'),tin=d.querySelector('#tpin'),sin=d.querySelector('#slin'),err=d.querySelector('#tpslerr'),prev=d.querySelector('#tpslprev'),mk=d.querySelector('#tpslmk');
  let busy=false,draw=null;
- const near=(a,b)=>a==null||b==null?a==b:Math.abs(a-b)<=Math.max(1e-8,Math.abs(b)*1e-8);
+ const near=(a,b)=>a==null||b==null?a==b:rawpx(a)===rawpx(b);
  const cur=()=>{const mark=liveMark(p);return{stop:parseLvl(sin.value),target:parseLvl(tin.value),mark}};
  const paint=()=>{const v=cur(),effS=Number.isFinite(v.stop)?v.stop:p.stop,effT=Number.isFinite(v.target)?v.target:p.target;
   if(mk)mk.textContent=px(v.mark);prev.innerHTML=previewHTML(p,effS,effT,v.mark);
